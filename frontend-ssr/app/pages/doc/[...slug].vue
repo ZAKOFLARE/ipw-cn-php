@@ -107,6 +107,7 @@ html.dark .box {
     overflow-y: auto;    /* 菜单项过多时，侧边栏内部出现滚动条 */
     border-right: 1px solid #e4e7ed; /* 添加右侧分割线（可选） */
 }
+
 .content {
     flex: 1;             /* 右侧内容区域占据剩余空间 */
     padding: 20px;       /* 内边距，避免内容贴边 */
@@ -115,6 +116,15 @@ html.dark .box {
 }
 html.dark .content {
     background-color: #242424; /* 可选：暗黑模式下的背景色 */
+}
+
+@media (max-width: 768px) {
+    .sidebar-menu {
+        width: 100px;
+    }
+    .content {
+        padding: 10px;
+    }
 }
 </style>
 <style>

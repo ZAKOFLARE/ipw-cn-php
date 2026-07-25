@@ -116,10 +116,10 @@ onMounted(async () => {
   </div>
   <div class="content">
     <div class="one-line">
-      <b>IPv4</b>&nbsp<p>{{ yourIPv4 }} </p>&nbsp<a :href="`/ipv6?ip=${yourIPv4}`" target="_blank">查询归属地</a>
+      <b>IPv4</b>&nbsp<p>{{ yourIPv4 }} </p>&nbsp<RouterLink :to="`/location?ip=${yourIPv4}`" target="_blank">查询归属地</RouterLink>
     </div>
     <div class="one-line">
-      <b>IPv6</b>&nbsp<p v-if="yourIPv6">{{ yourIPv6 }}</p><a :href="`/ipv6?ip=${yourIPv6}`" target="_blank" v-if="yourIPv6">&nbsp查询归属地</a><a v-else href="https://www.bing.com/search?q=%E5%AE%B6%E5%AE%BD%E5%BC%80ipv6" target="_blank">没有IPv6地址,查看如何开启IPv6</a>
+      <b>IPv6</b>&nbsp<p v-if="yourIPv6">{{ yourIPv6 }}</p><RouterLink :to="`/location?ip=${yourIPv6}`" target="_blank" v-if="yourIPv6">&nbsp查询归属地</RouterLink><RouterLink v-else to="/doc/user/enable_ipv6" target="_blank">没有IPv6地址,查看如何开启IPv6</RouterLink>
     </div>
     <div style="font-size: 1.5em;">
       <h3 v-if="ipAddress && isIPv6(ipAddress)"><el-icon><CircleCheckFilled style="color: lightgreen;"/></el-icon>您的网络IPv6优先</h3>

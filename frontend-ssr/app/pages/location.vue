@@ -144,7 +144,7 @@ onMounted(async () => {
       </el-button>
     </div>
     <div class="location">
-      <div class="one-line" style="height: 40px;">
+      <div class="ip-info" style="height: 40px;">
         <b>IP</b>&nbsp<p>{{ ipAddress }}</p>
       </div>
       <div v-if="IPLocation" class="result-section">
