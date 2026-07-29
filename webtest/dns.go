@@ -28,7 +28,7 @@ type DNSResult struct {
 	Duration float64  `json:"duration"`
 }
 
-func QueryA(domain string) (DNSResult, error) {
+func ResolveARecord(domain string) (DNSResult, error) {
 	start := time.Now()
 	msg := new(dns.Msg)
 	client := new(dns.Client)
@@ -373,8 +373,8 @@ type DNSFullResult struct {
 	CAA    DNSResult `json:"caa"`
 }
 
-// QueryAllDNSRecords 并行查询所有主流DNS记录类型（不包含PTR）
-func QueryAllDNSRecords(domain string) DNSFullResult {
+// ResolveARecordllDNSRecords 并行查询所有主流DNS记录类型（不包含PTR）
+func ResolveARecordllDNSRecords(domain string) DNSFullResult {
 	result := DNSFullResult{Domain: domain}
 
 	var wg sync.WaitGroup
@@ -382,7 +382,7 @@ func QueryAllDNSRecords(domain string) DNSFullResult {
 
 	go func() {
 		defer wg.Done()
-		result.A, _ = QueryA(domain)
+		result.A, _ = ResolveARecord(domain)
 	}()
 
 	go func() {

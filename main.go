@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"lemon-ipw/ipdb"
@@ -31,34 +32,30 @@ func initHTTPClients() {
 	setTransport := func(network string) *http.Transport {
 		dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
 		return &http.Transport{
-			// DialContext performs SSRF validation before establishing connections.
-			// 1. Reuse validated IPs from context (cached by ValidateOutboundTarget).
-			// 2. Resolve hostname via DNS if no cached IPs exist.
-			// 3. Block connections to private/internal IPs.
-			// 4. Pin the connection to the first resolved IP to prevent DNS rebinding.
 			DialContext: func(ctx context.Context, _, addr string) (net.Conn, error) {
 				if ssrf.Enabled() {
 					host, port, err := net.SplitHostPort(addr)
 					if err != nil {
 						return nil, err
 					}
-					var ips []net.IP
-					if v, ok := ctx.Value(ssrf.ValidatedIPsKey()).([]net.IP); ok {
-						ips = v
+					var dnsResult webtest.DNSResult
+					if network == "tcp4" {
+						dnsResult, err = webtest.ResolveARecord(host)
 					} else {
-						ips, err = net.LookupIP(host)
-						if err != nil {
-							return nil, err
-						}
+						dnsResult, err = webtest.ResolveAAAARecord(host)
 					}
-					for _, ip := range ips {
-						if ssrf.IsPrivateIP(ip) {
+					if err != nil {
+						return nil, err
+					}
+					for _, ipStr := range dnsResult.Record {
+						ip := net.ParseIP(ipStr)
+						if ip != nil && ssrf.IsPrivateIP(ip) {
 							slog.Warn("Blocked connection to private IP", "host", host, "ip", ip)
 							return nil, fmt.Errorf("request to private/internal address is not allowed")
 						}
 					}
-					if len(ips) > 0 {
-						addr = net.JoinHostPort(ips[0].String(), port)
+					if len(dnsResult.Record) > 0 {
+						addr = net.JoinHostPort(dnsResult.Record[0], port)
 					}
 				}
 				return dialer.DialContext(ctx, network, addr)
@@ -229,6 +226,7 @@ var (
 	sfGroup      singleflight.Group
 	V6Client     *resty.Client
 	V4Client     *resty.Client
+	IPDB         string
 )
 
 type websiteCacheEntry struct {
@@ -444,91 +442,12 @@ func websiteSpeed(url string, version string) (*WebsiteSpeedTestResult, error) {
 }
 
 func checkSSL(url string, version string) (*SSLCheckDetail, error) {
-	parsedURL, err := parseURL(url)
-	if err != nil {
-		return nil, err
-	}
-
 	ctx := context.Background()
+	var err error
 	ctx, err = ssrf.ValidateOutboundTarget(ctx, url)
 	if err != nil {
 		return nil, err
 	}
-
-	var network string
-	if version == "v6" {
-		network = "tcp6"
-	} else {
-		network = "tcp4"
-	}
-
-	host := parsedURL.Hostname()
-	port := parsedURL.Port()
-	if port == "" {
-		port = "443"
-	}
-
-	addr := fmt.Sprintf("%s:%s", host, port)
-
-	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
-	if ssrf.Enabled() {
-		var ipStr string
-		if v, ok := ctx.Value(ssrf.ValidatedIPsKey()).([]net.IP); ok && len(v) > 0 {
-			ipStr = v[0].String()
-		} else {
-			ips, err := net.LookupIP(host)
-			if err != nil {
-				return nil, err
-			}
-			ipStr = ips[0].String()
-		}
-		parsedIP := net.ParseIP(ipStr)
-		if parsedIP != nil && ssrf.IsPrivateIP(parsedIP) {
-			slog.Warn("Blocked SSL connection to private IP", "host", host, "ip", ipStr)
-			return nil, fmt.Errorf("request to private/internal address is not allowed")
-		}
-		addr = net.JoinHostPort(ipStr, port)
-	}
-	conn, err := dialer.DialContext(ctx, network, addr)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
-
-	tlsConn := tls.Client(conn, &tls.Config{
-		ServerName:         host,
-		InsecureSkipVerify: true,
-	})
-	defer tlsConn.Close()
-
-	if err := tlsConn.Handshake(); err != nil {
-		return &SSLCheckDetail{
-			CertValidityDays:   0,
-			IsExpired:          true,
-			CertStartTime:      time.Time{},
-			CertEndTime:        time.Time{},
-			HTTPVersion:        "",
-			HostRecord:         addr,
-			HTTPSSStatusCode:   0,
-			TotalTime:          0,
-			DownloadSpeed:      0,
-			Domain:             host,
-			IssuerOrganization: []string{},
-			IssuerCommonName:   "TLS Handshake Failed",
-			SubjectCommonName:  host,
-			IsReachable:        false,
-		}, nil
-	}
-
-	state := tlsConn.ConnectionState()
-	if len(state.PeerCertificates) == 0 {
-		return nil, fmt.Errorf("no SSL certificate found")
-	}
-
-	cert := state.PeerCertificates[0]
-	now := time.Now()
-	remainingDays := int(cert.NotAfter.Sub(now).Hours() / 24)
-	isExpired := now.After(cert.NotAfter) || now.Before(cert.NotBefore)
 
 	client := V4Client
 	if version == "v6" {
@@ -536,22 +455,41 @@ func checkSSL(url string, version string) (*SSLCheckDetail, error) {
 	}
 
 	startTime := time.Now()
-	resp, err := client.R().EnableTrace().Get(url)
+	resp, err := client.R().EnableTrace().SetContext(ctx).Get(url)
 	if err != nil {
 		return nil, err
 	}
 	endTime := time.Now()
 
-	body := resp.Bytes()
+	trace := resp.Request.TraceInfo()
+	hostRecord := cleanHostRecord(trace.RemoteAddr)
+
 	totalTime := float64(endTime.Sub(startTime).Milliseconds())
+	body := resp.Bytes()
 	var downloadSpeed float64
 	if totalTime > 0 {
 		downloadSpeed = float64(len(body)) / 1024.0 / (totalTime / 1000.0)
 	}
 
-	hostRecord := resp.Request.TraceInfo().RemoteAddr
-	hostRecord = cleanHostRecord(hostRecord)
-	domain := cleanHostRecord(state.ServerName)
+	rawResp := resp.RawResponse
+	var cert *x509.Certificate
+	var remainingDays int
+	var isExpired bool
+	var issuerOrganization []string
+	var issuerCommonName, subjectCommonName, domain string
+
+	if rawResp.TLS != nil && len(rawResp.TLS.PeerCertificates) > 0 {
+		cert = rawResp.TLS.PeerCertificates[0]
+		now := time.Now()
+		remainingDays = int(cert.NotAfter.Sub(now).Hours() / 24)
+		isExpired = now.After(cert.NotAfter) || now.Before(cert.NotBefore)
+		issuerOrganization = cert.Issuer.Organization
+		issuerCommonName = cert.Issuer.CommonName
+		subjectCommonName = cert.Subject.CommonName
+		domain = cleanHostRecord(cert.Subject.CommonName)
+	} else {
+		return nil, fmt.Errorf("no SSL certificate found")
+	}
 
 	result := &SSLCheckDetail{
 		CertValidityDays:   remainingDays,
@@ -564,9 +502,9 @@ func checkSSL(url string, version string) (*SSLCheckDetail, error) {
 		TotalTime:          totalTime,
 		DownloadSpeed:      downloadSpeed,
 		Domain:             domain,
-		IssuerOrganization: cert.Issuer.Organization,
-		IssuerCommonName:   cert.Issuer.CommonName,
-		SubjectCommonName:  cert.Subject.CommonName,
+		IssuerOrganization: issuerOrganization,
+		IssuerCommonName:   issuerCommonName,
+		SubjectCommonName:  subjectCommonName,
 		IsReachable:        true,
 	}
 
@@ -886,7 +824,7 @@ func dnsQueryHandler(c *gin.Context) {
 	recodeType := c.Param("type")
 	switch recodeType {
 	case "a":
-		result, err := webtest.QueryA(domain)
+		result, err := webtest.ResolveARecord(domain)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": err.Error(),
@@ -1100,31 +1038,32 @@ func readConfig() {
 	// 如果当前测速节点机器是单栈网络，建议设置 SINGLE_STACK 环境变量来跳过另一个协议的测试，以避免不必要的错误日志和延迟
 	SINGLE_STACK = strings.ToLower(strings.TrimSpace(os.Getenv("SINGLE_STACK")))
 	DNS_SERVER = os.Getenv("DNS_SERVER")
+	IPDB = os.Getenv("IPDB")
 	ssrf.SetEnabled(os.Getenv("BLOCK_PRIVATE_IPS") != "false" && os.Getenv("BLOCK_PRIVATE_IPS") != "0")
 
 	// SINGLE_STACK is intentionally excluded: empty string is a valid value (dual-stack).
-	needConfigFile := PORTS == "" || GH_PROXY == "" || DNS_SERVER == ""
-	if needConfigFile {
-		viper.SetConfigName("setting")
-		viper.SetConfigType("json")
-		viper.AddConfigPath(".")
-		if err := viper.ReadInConfig(); err != nil {
-			slog.Warn("Failed to read config file, using defaults", "error", err)
-		}
-		if PORTS == "" {
-			PORTS = viper.GetString("port")
-		}
-		if GH_PROXY == "" {
-			GH_PROXY = viper.GetString("gh-proxy")
-		}
-		if SINGLE_STACK == "" {
-			SINGLE_STACK = strings.ToLower(strings.TrimSpace(viper.GetString("single-stack")))
-		}
-		if DNS_SERVER == "" {
-			DNS_SERVER = viper.GetString("dns-server")
-		}
-	}
 
+	viper.SetConfigName("setting")
+	viper.SetConfigType("json")
+	viper.AddConfigPath(".")
+	if err := viper.ReadInConfig(); err != nil {
+		slog.Warn("Failed to read config file, using defaults", "error", err)
+	}
+	if PORTS == "" {
+		PORTS = viper.GetString("port")
+	}
+	if GH_PROXY == "" {
+		GH_PROXY = viper.GetString("gh-proxy")
+	}
+	if SINGLE_STACK == "" {
+		SINGLE_STACK = strings.ToLower(strings.TrimSpace(viper.GetString("single-stack")))
+	}
+	if DNS_SERVER == "" {
+		DNS_SERVER = viper.GetString("dns-server")
+	}
+	if IPDB == "" {
+		IPDB = viper.GetString("ipdb")
+	}
 	if PORTS == "" {
 		PORTS = "8080"
 	}
@@ -1135,22 +1074,26 @@ func main() {
 	readConfig()
 	webtest.SetDNSServer(DNS_SERVER)
 	initHTTPClients()
+	if IPDB != "false" {
+		ipdb.Init(GH_PROXY)
+	}
 	slog.Info("Starting server", "port", PORTS, "gh_proxy", GH_PROXY, "single_stack", SINGLE_STACK, "dns_server", DNS_SERVER)
-	ipdb.Init(GH_PROXY)
 
 	r := gin.Default()
 	r.Use(cors.Default())
 
 	r.GET("/v1/detail/*url", checkWebsiteHandler)
 	r.GET("/v1/ssl/*url", sslCheckHandler)
-	r.GET("/v1/location/:ip", locateIP)
-	r.GET("/v1/location", locateUserIP)
+
 	r.GET("/v1/tcping/:ip", pingHandler)
 	r.GET("/v1/dns/:type/*domain", dnsQueryHandler)
 	r.GET("/v1/speed/:version/*url", websiteSpeedTestHandler)
 
 	r.GET("/", healchCheck)
-
+	if IPDB != "false" {
+		r.GET("/v1/location/:ip", locateIP)
+		r.GET("/v1/location", locateUserIP)
+	}
 	if err := r.Run(":" + PORTS); err != nil {
 		slog.Error("Server failed to start", "error", err)
 	}

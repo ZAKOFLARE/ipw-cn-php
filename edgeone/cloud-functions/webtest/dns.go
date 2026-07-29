@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -94,7 +95,7 @@ func executeDoHQuery(domain string, qtype uint16) (*dns.Msg, float64, error) {
 // 业务层：调用底层函数并提取特定记录
 // ==========================================
 
-func QueryA(domain string) (DNSResult, error) {
+func ResolveARecord(domain string) (DNSResult, error) {
 	result := DNSResult{Domain: domain, Record: []string{}}
 	responseMsg, duration, err := executeDoHQuery(domain, dns.TypeA)
 	result.Duration = duration
@@ -274,6 +275,16 @@ func ResolveCAARecord(domain string) (DNSResult, error) {
 
 // ResolveIP 通过 DoH 解析域名，返回指定版本（v4/v6）的 IP 地址字符串
 func ResolveIP(host string, version string) (string, error) {
+	if ip := net.ParseIP(host); ip != nil {
+		if version == "v4" && ip.To4() != nil {
+			return ip.String(), nil
+		}
+		if version == "v6" && ip.To4() == nil && ip.To16() != nil {
+			return ip.String(), nil
+		}
+		return "", fmt.Errorf("no %s address found for %s", version, host)
+	}
+
 	var qtype uint16
 	switch version {
 	case "v6":
@@ -319,12 +330,12 @@ type DNSFullResult struct {
 	CAA    DNSResult `json:"caa"`
 }
 
-func QueryAllDNSRecords(domain string) DNSFullResult {
+func ResolveARecordllDNSRecords(domain string) DNSFullResult {
 	result := DNSFullResult{Domain: domain}
 	var wg sync.WaitGroup
 	wg.Add(8)
 
-	go func() { defer wg.Done(); result.A, _ = QueryA(domain) }()
+	go func() { defer wg.Done(); result.A, _ = ResolveARecord(domain) }()
 	go func() { defer wg.Done(); result.AAAA, _ = ResolveAAAARecord(domain) }()
 	go func() { defer wg.Done(); result.CNAME, _ = ResolveCNAMERecord(domain) }()
 	go func() { defer wg.Done(); result.MX, _ = ResolveMXRecord(domain) }()

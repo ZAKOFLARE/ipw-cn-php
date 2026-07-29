@@ -185,34 +185,30 @@ func initHttpClient() {
 	setTransport := func(network string) *http.Transport {
 		dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
 		return &http.Transport{
-			// DialContext performs SSRF validation before establishing connections.
-			// 1. Reuse validated IPs from context (cached by ValidateOutboundTarget).
-			// 2. Resolve hostname via DNS if no cached IPs exist.
-			// 3. Block connections to private/internal IPs.
-			// 4. Pin the connection to the first resolved IP to prevent DNS rebinding.
 			DialContext: func(ctx context.Context, _, addr string) (net.Conn, error) {
 				if ssrf.Enabled() {
 					host, port, err := net.SplitHostPort(addr)
 					if err != nil {
 						return nil, err
 					}
-					var ips []net.IP
-					if v, ok := ctx.Value(ssrf.ValidatedIPsKey()).([]net.IP); ok {
-						ips = v
+					var dnsResult webtest.DNSResult
+					if network == "tcp4" {
+						dnsResult, err = webtest.ResolveARecord(host)
 					} else {
-						ips, err = net.LookupIP(host)
-						if err != nil {
-							return nil, err
-						}
+						dnsResult, err = webtest.ResolveAAAARecord(host)
 					}
-					for _, ip := range ips {
-						if ssrf.IsPrivateIP(ip) {
+					if err != nil {
+						return nil, err
+					}
+					for _, ipStr := range dnsResult.Record {
+						ip := net.ParseIP(ipStr)
+						if ip != nil && ssrf.IsPrivateIP(ip) {
 							slog.Warn("Blocked connection to private IP", "host", host, "ip", ip)
 							return nil, fmt.Errorf("request to private/internal address is not allowed")
 						}
 					}
-					if len(ips) > 0 {
-						addr = net.JoinHostPort(ips[0].String(), port)
+					if len(dnsResult.Record) > 0 {
+						addr = net.JoinHostPort(dnsResult.Record[0], port)
 					}
 				}
 				return dialer.DialContext(ctx, network, addr)
@@ -793,7 +789,7 @@ func dnsQueryHandler(c *gin.Context) {
 	recodeType := c.Param("type")
 	switch recodeType {
 	case "a":
-		result, err := webtest.QueryA(domain)
+		result, err := webtest.ResolveARecord(domain)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": err.Error(),
@@ -1003,6 +999,7 @@ func readConfig() {
 
 func main() {
 	readConfig()
+	initHttpClient()
 	webtest.SetDNSServer(DNS_SERVER)
 	slog.Info("Starting server", "port", PORTS, "single_stack", SINGLE_STACK)
 	r := gin.Default()
