@@ -988,7 +988,7 @@ func healchCheck(c *gin.Context) {
 }
 func readConfig() {
 	PORTS = os.Getenv("PORTS")
-	if PORTS = ""{
+	if PORTS == ""{
 		os.Getenv("PORT")
 	}
 	SINGLE_STACK = os.Getenv("SINGLE_STACK")
