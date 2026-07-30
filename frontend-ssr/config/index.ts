@@ -27,7 +27,7 @@ const config = {
     ],
     IPLocationAPIs: [
         {
-            label: "中国 四川 沙渠 电信",
+            label: "中国 四川 沙渠 电信[ZFC]",
             url: "https://cn2-sichuan.api-ipw.wsmdn.top/"
         }
     ],
@@ -54,17 +54,17 @@ const config = {
                 url :"https://sg-1.api-ipw.wsmdn.top/",
             },
             {
-                label: "中国 陕西 西安 北经济技术开发区 未央区凤城 中国电信",
+                label: "中国 陕西 西安 北经济技术开发区 未央区凤城 中国电信[ZFC]",
                 url :"https://cn-xian-shaanxiprovince.api-ipw.wsmdn.top/",
             },
         ],
         IPv6: [
             {
-                label: "中国 四川 沙渠 电信",
+                label: "中国 四川 沙渠 电信[ZFC]",
                 url:"https://cn2-sichuan.api-ipw.wsmdn.top/",
             },
             {
-                label: "中国 香港 九龙城区 旺角东 Cloudie",
+                label: "中国 香港 九龙城区 旺角东 Cloudie[ZFC]",
                 url:"https://lntl-cn-hk-kowloon.api-ipw.wsmdn.top/",
             }
         ]
@@ -90,17 +90,17 @@ const config = {
                 url :"https://sg-1.api-ipw.wsmdn.top/",
             },
             {
-                label: "中国 陕西 西安 北经济技术开发区 未央区凤城 中国电信",
+                label: "中国 陕西 西安 北经济技术开发区 未央区凤城 中国电信[ZFC]",
                 url :"https://cn-xian-shaanxiprovince.api-ipw.wsmdn.top/",
             },
         ],
         IPv6: [
             {
-                label: "中国 四川 沙渠 电信",
+                label: "中国 四川 沙渠 电信[ZFC]",
                 url:"https://cn2-sichuan.api-ipw.wsmdn.top/",
             },
             {
-                label: "中国 香港 九龙城区 旺角东 Cloudie",
+                label: "中国 香港 九龙城区 旺角东 Cloudie[ZFC]",
                 url:"https://lntl-cn-hk-kowloon.api-ipw.wsmdn.top/",
             }
         ]
@@ -119,15 +119,15 @@ const config = {
             url :"https://sg-1.api-ipw.wsmdn.top/",
         },
         {
-            label: "中国 四川 沙渠 电信",
+            label: "中国 四川 沙渠 电信[ZFC]",
             url:"https://cn2-sichuan.api-ipw.wsmdn.top/",
         },
         {
-            label: "中国 陕西 西安 北经济技术开发区 未央区凤城 中国电信",
+            label: "中国 陕西 西安 北经济技术开发区 未央区凤城 中国电信[ZFC]",
             url :"https://cn-xian-shaanxiprovince.api-ipw.wsmdn.top/",
         },
         {
-            label: "中国 香港 九龙城区 旺角东 Cloudie",
+            label: "中国 香港 九龙城区 旺角东 Cloudie[ZFC]",
             url:"https://lntl-cn-hk-kowloon.api-ipw.wsmdn.top/",
         },
         {

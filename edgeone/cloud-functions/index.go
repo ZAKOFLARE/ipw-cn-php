@@ -213,7 +213,8 @@ func initHttpClient() {
 				}
 				return dialer.DialContext(ctx, network, addr)
 			},
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig:    &tls.Config{InsecureSkipVerify: true},
+			DisableKeepAlives:  true,
 		}
 	}
 	V6Client = resty.New()
@@ -296,6 +297,14 @@ func checkWebsite(url string, version string) (*WebsiteCheckDetail, error) {
 
 	hostRecord := cleanHostRecord(trace.RemoteAddr)
 
+	dnsLookupTime := trace.DNSLookup.Seconds() * 1000
+	if dnsLookupTime == 0 {
+		dnsLookupTime = measureDNSTime(url, version)
+	}
+	tcpConnectTime := trace.TCPConnTime.Seconds() * 1000
+	httpConnectTime := trace.ConnTime.Seconds() * 1000
+	firstByteTime := trace.ServerTime.Seconds() * 1000
+
 	totalTime := float64(endTime.Sub(startTime).Milliseconds())
 	var downloadSpeed float64
 	if totalTime > 0 {
@@ -312,10 +321,10 @@ func checkWebsite(url string, version string) (*WebsiteCheckDetail, error) {
 		HostRecord:       hostRecord,
 		HTTPStatusCode:   httpStatus,
 		HTTPSSStatusCode: httpsStatus,
-		DNSLookupTime:    float64(trace.DNSLookup.Milliseconds()),
-		TCPConnectTime:   float64(trace.TCPConnTime.Milliseconds()),
-		HTTPConnectTime:  float64(trace.ConnTime.Milliseconds()),
-		FirstByteTime:    float64(trace.ServerTime.Milliseconds()),
+		DNSLookupTime:    dnsLookupTime,
+		TCPConnectTime:   tcpConnectTime,
+		HTTPConnectTime:  httpConnectTime,
+		FirstByteTime:    firstByteTime,
 		TotalTime:        totalTime,
 		PageSize:         int64(len(body)),
 		DownloadSpeed:    downloadSpeed,
@@ -359,6 +368,14 @@ func websiteSpeed(url string, version string) (*WebsiteSpeedTestResult, error) {
 
 	hostRecord := cleanHostRecord(trace.RemoteAddr)
 
+	dnsLookupTime := trace.DNSLookup.Seconds() * 1000
+	if dnsLookupTime == 0 {
+		dnsLookupTime = measureDNSTime(url, version)
+	}
+	tcpConnectTime := trace.TCPConnTime.Seconds() * 1000
+	httpConnectTime := trace.ConnTime.Seconds() * 1000
+	firstByteTime := trace.ServerTime.Seconds() * 1000
+
 	totalTime := float64(endTime.Sub(startTime).Milliseconds())
 	var downloadSpeed float64
 	if totalTime > 0 {
@@ -376,10 +393,10 @@ func websiteSpeed(url string, version string) (*WebsiteSpeedTestResult, error) {
 		HostRecord:       hostRecord,
 		HTTPStatusCode:   httpStatus,
 		HTTPSSStatusCode: httpsStatus,
-		DNSLookupTime:    float64(trace.DNSLookup.Milliseconds()),
-		TCPConnectTime:   float64(trace.TCPConnTime.Milliseconds()),
-		HTTPConnectTime:  float64(trace.ConnTime.Milliseconds()),
-		FirstByteTime:    float64(trace.ServerTime.Milliseconds()),
+		DNSLookupTime:    dnsLookupTime,
+		TCPConnectTime:   tcpConnectTime,
+		HTTPConnectTime:  httpConnectTime,
+		FirstByteTime:    firstByteTime,
 		TotalTime:        totalTime,
 		PageSize:         int64(len(body)),
 		DownloadSpeed:    downloadSpeed,
@@ -387,6 +404,28 @@ func websiteSpeed(url string, version string) (*WebsiteSpeedTestResult, error) {
 	}
 
 	return result, nil
+}
+
+func measureDNSTime(urlStr string, version string) float64 {
+	parsed, err := url.Parse(urlStr)
+	if err != nil {
+		return 0
+	}
+	host := parsed.Hostname()
+	if host == "" {
+		return 0
+	}
+	start := time.Now()
+	var dnsErr error
+	if version == "v6" {
+		_, dnsErr = webtest.ResolveAAAARecord(host)
+	} else {
+		_, dnsErr = webtest.ResolveARecord(host)
+	}
+	if dnsErr != nil {
+		return 0
+	}
+	return time.Since(start).Seconds() * 1000
 }
 
 func checkSSL(url string, version string) (*SSLCheckDetail, error) {
