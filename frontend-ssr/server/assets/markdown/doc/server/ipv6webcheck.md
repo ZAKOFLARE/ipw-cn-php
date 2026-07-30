@@ -13,7 +13,7 @@
 
 同一个主机名是可以同时解析到 IPv4（A 记录）、IPv6(AAAA 记录)，用户本地网络 IPv6 访问优先时，会自动解析、访问到 IPv6 地址，否则会解析到 IPv4 地址。
 
--   AAAA 记录 ([在线 DNS 查询工具](https://itdog.cn/dns/))
+-   AAAA 记录 ([在线 DNS 查询工具](https://ipw.wsmdn.top/dns))
 
 -   A 记录
 
@@ -22,7 +22,7 @@
 
 如果网站直接监听在 IPv6 地址上，则可以在 IPv6 地址两侧加上 `[]`, 即可[访问 IPv6 网址](/user/view_ipv6_adress_url)。
 
--   直接访问 IPv6 地址 （[IPv6 网站测速工具](https://itdog.cn/http_ipv6)）
+-   直接访问 IPv6 地址 （[IPv6 网站测速工具](https://ipw.wsmdn.top/ipv6speedtest)）
 
 -   访问解析到 IPv6 地址的域名
 

@@ -988,6 +988,9 @@ func healchCheck(c *gin.Context) {
 }
 func readConfig() {
 	PORTS = os.Getenv("PORTS")
+	if PORTS = ""{
+		os.Getenv("PORT")
+	}
 	SINGLE_STACK = os.Getenv("SINGLE_STACK")
 	DNS_SERVER = os.Getenv("DNS_SERVER")
 	ssrf.SetEnabled(os.Getenv("BLOCK_PRIVATE_IPS") != "false" && os.Getenv("BLOCK_PRIVATE_IPS") != "0")

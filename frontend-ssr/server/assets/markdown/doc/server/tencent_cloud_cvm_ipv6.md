@@ -126,7 +126,7 @@ PING 6.wsmdn.dpdns.org(2402:4e00:1013:e500:0:9671:f018:4947 (2402:4e00:1013:e500
 ```
 
 
-当然，也可以在线 [IPv6 Ping 测试工具](https://itdog.cn/ping_ipv6/) 进行检查。
+当然，也可以在线 [IPv6 TCPing 测试工具](https://ipw.wsmdn.top/ipv6tcping) 进行检查。
 
 此外，通过 [IPv6 地址查询工具](https://ipw.wsmdn.top/ipv6/) 可以查询对应 IPv6 地址所属的地理位置。
 

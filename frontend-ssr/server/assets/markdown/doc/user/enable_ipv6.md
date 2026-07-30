@@ -79,7 +79,7 @@ IPv6 网络开启成功后，我们需要验证下是否真正开启成功。
 ### 3.1 网页访问验证
 这是一个 [IPv6 地址查询](https://ipw.wsmdn.top/ipv6) 的网站，可以看到上面提示 您的网络 IPv6 访问优先。
 
-也可以对自己的公网 IPv6 地址进行 [在线 Ping](https://itdog.cn/ping_ipv6)。
+也可以对自己的公网 IPv6 地址进行 [在线 TCPing](https://ipw.wsmdn.top/ipv6tcping)。
 
 ### 3.2 域名访问验证
 打开 [https://6.wsmdn.dpdns.org/](https://6.wsmdn.dpdns.org/)，如果能访问成功，那么证明 IPv6 网络开启成功。

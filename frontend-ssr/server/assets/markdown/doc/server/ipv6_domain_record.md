@@ -69,4 +69,4 @@ ns4.dnsv2.com.		157105	IN	A	183.192.164.118
 
 ### 在线多地域 DNS 解析
 
-通过 [IPv6 在线域名解析工具](https://itdog.cn/dns/) 对其解析验证。
+通过 [IPv6 在线域名解析工具](https://ipw.wsmdn.top/dns) 对其解析验证。
