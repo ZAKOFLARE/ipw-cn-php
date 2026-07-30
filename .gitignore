@@ -12,3 +12,4 @@ short.txt
 *.exe
 lemon-ipw
 .mmdb.tmp
+*.tmp
