@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import { config } from '../../config/index';
 import { isIPv6 } from 'is-ip';
 import { renderMarkdown } from "../../utils/markdown";
-import { formatTime } from '~/utils/tools';
+import { formatTime } from '../../utils/tools';
 const route = useRoute()
 
 useHead({

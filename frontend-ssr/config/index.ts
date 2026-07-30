@@ -15,9 +15,22 @@ const config = {
     v4OnlyAPI: "https://4.wsmdn.dpdns.org/",
     v6OnlyAPI: "https://6.wsmdn.dpdns.org/",
     DualStackAPI: "https://test.wsmdn.dpdns.org/",
-    // 后端API地址
-    apiBaseUrl: 'https://cn-jiangsu.api-ipw.wsmdn.top/',
-    IPLocationAPI : "https://cn2-sichuan.api-ipw.wsmdn.top/",
+    apiBaseUrls: [
+        {
+            label: "中国 江苏 移动",
+            url: "https://cn-jiangsu.api-ipw.wsmdn.top/"
+        },
+        {
+            label: "中国 广东 深圳 龙岗 坪地街道 中国移动",
+            url: "https://cn-shenzhen.api-ipw.wsmdn.top/"
+        }
+    ],
+    IPLocationAPIs: [
+        {
+            label: "中国 四川 沙渠 电信",
+            url: "https://cn2-sichuan.api-ipw.wsmdn.top/"
+        }
+    ],
     // 全站是否禁止搜索引擎索引
     noindex: false,
     TCPing:{
@@ -26,9 +39,12 @@ const config = {
                 label: "中国 江苏 移动",
                 url :"https://cn-jiangsu.api-ipw.wsmdn.top/",
             },
+            {
+                label: "中国 广东 深圳 龙岗 坪地街道 中国移动",
+                url :"https://cn-shenzhen.api-ipw.wsmdn.top/",
+            },
         ],
         IPv4: [
-            
             {
                 label: "中国 广东 广州 腾讯云",
                 url :"https://cn-guangzhou.api-ipw.wsmdn.top/",
@@ -37,15 +53,21 @@ const config = {
                 label: "新加坡 腾讯云",
                 url :"https://sg-1.api-ipw.wsmdn.top/",
             },
+            {
+                label: "中国 陕西 西安 北经济技术开发区 未央区凤城 中国电信",
+                url :"https://cn-xian-shaanxiprovince.api-ipw.wsmdn.top/",
+            },
         ],
         IPv6: [
-            
             {
                 label: "中国 四川 沙渠 电信",
                 url:"https://cn2-sichuan.api-ipw.wsmdn.top/",
+            },
+            {
+                label: "中国 香港 九龙城区 旺角东 Cloudie",
+                url:"https://lntl-cn-hk-kowloon.api-ipw.wsmdn.top/",
             }
         ]
-
     },
     SpeedTest:{
         DualStack: [
@@ -53,9 +75,12 @@ const config = {
                 label: "中国 江苏 移动",
                 url :"https://cn-jiangsu.api-ipw.wsmdn.top/",
             },
+            {
+                label: "中国 广东 深圳 龙岗 坪地街道 中国移动",
+                url :"https://cn-shenzhen.api-ipw.wsmdn.top/",
+            },
         ],
         IPv4: [
-            
             {
                 label: "中国 广东 广州 腾讯云",
                 url :"https://cn-guangzhou.api-ipw.wsmdn.top/",
@@ -64,12 +89,19 @@ const config = {
                 label: "新加坡 腾讯云",
                 url :"https://sg-1.api-ipw.wsmdn.top/",
             },
+            {
+                label: "中国 陕西 西安 北经济技术开发区 未央区凤城 中国电信",
+                url :"https://cn-xian-shaanxiprovince.api-ipw.wsmdn.top/",
+            },
         ],
         IPv6: [
-            
             {
                 label: "中国 四川 沙渠 电信",
                 url:"https://cn2-sichuan.api-ipw.wsmdn.top/",
+            },
+            {
+                label: "中国 香港 九龙城区 旺角东 Cloudie",
+                url:"https://lntl-cn-hk-kowloon.api-ipw.wsmdn.top/",
             }
         ]
     },
@@ -86,12 +118,22 @@ const config = {
             label: "新加坡 腾讯云",
             url :"https://sg-1.api-ipw.wsmdn.top/",
         },
-            
         {
             label: "中国 四川 沙渠 电信",
             url:"https://cn2-sichuan.api-ipw.wsmdn.top/",
+        },
+        {
+            label: "中国 陕西 西安 北经济技术开发区 未央区凤城 中国电信",
+            url :"https://cn-xian-shaanxiprovince.api-ipw.wsmdn.top/",
+        },
+        {
+            label: "中国 香港 九龙城区 旺角东 Cloudie",
+            url:"https://lntl-cn-hk-kowloon.api-ipw.wsmdn.top/",
+        },
+        {
+            label: "中国 广东 深圳 龙岗 坪地街道 中国移动",
+            url :"https://cn-shenzhen.api-ipw.wsmdn.top/",
         }
-
     ]
 }
 export { config }

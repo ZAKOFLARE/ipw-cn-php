@@ -4,7 +4,7 @@ import { isIPv6 } from 'is-ip';
 import { config } from '../../config/index';
 import { CircleCheckFilled, CircleCloseFilled } from '@element-plus/icons-vue';
 import { highlightCode } from '../../utils/shiki';
-import { isIPv4 } from '~/utils/tools';
+import { isIPv4 } from '../../utils/tools';
 const route = useRoute();
 const canonicalUrl = computed(() => new URL(route.path, config.siteUrl).toString());
 

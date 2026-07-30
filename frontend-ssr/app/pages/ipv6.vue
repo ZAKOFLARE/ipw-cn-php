@@ -5,7 +5,7 @@ import {config} from '../../config/index';
 import { CircleCheckFilled, CircleCloseFilled } from '@element-plus/icons-vue';
 import { useRoute } from 'vue-router'
 import { highlightCode } from '../../utils/shiki'
-import { extractHost, isIPv4 } from '~/utils/tools';
+import { extractHost, isIPv4 } from '../../utils/tools';
 const route = useRoute();
 const loading = ref(false);
 
@@ -42,7 +42,9 @@ curl ${config.v6OnlyAPI}
 curl ${config.DualStackAPI}
 `.trim();
 const html = ref('');
-const remoteAPI = ref(config.IPLocationAPI);
+const apiList = config.IPLocationAPIs
+const currentApiIndex = ref(0)
+const remoteAPI = computed(() => apiList[currentApiIndex.value].url)
 const ipAddress = ref('');
 const IPLocation = ref<IPLocationType>({});
 const UserIP = ref('');

@@ -2,7 +2,7 @@
 import { ref, onMounted, computed, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { config } from '../../config/index';
-import { extractHost } from '~/utils/tools';
+import { extractHost } from '../../utils/tools';
 
 const route = useRoute()
 

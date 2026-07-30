@@ -48,8 +48,7 @@ h2{
     flex-direction: row;
     justify-content: flex-start;
     align-items: center;
-    flex-wrap: wrap;
-    overflow-wrap: anywhere
+    flex-wrap: nowrap;
 }
 .ip-info{
     display: flex;
@@ -135,11 +134,11 @@ footer {
     }
 
     h1 {
-        font-size: 1.8em;
+        font-size: 1.5em;
     }
 
     .title p {
-        font-size: 1em;
+        font-size: 0.8em;
         margin-right: 10px;
         margin-left: 10px;
     }
@@ -163,6 +162,26 @@ footer {
 
     footer .one-line a {
         font-size: 0.9em;
+    }
+    .one-line {
+        flex-wrap: wrap;
+        word-break: break-all;
+        hyphens: none; /* 防止自动添加连字符 */
+    }
+    blockquote {
+        font-size:0.9em;
+
+    }
+    blockquote p {
+        font-size:0.5em;
+        display: inline;
+        margin: 0.5em;
+    }
+    blockquote a{
+      
+        color: #3EAF7C;
+        font-size: 0.5em;
+        text-decoration: none
     }
 }
 html.dark {

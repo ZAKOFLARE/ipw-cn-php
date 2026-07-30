@@ -5,7 +5,7 @@ import {config} from '../../config/index';
 import { CircleCheckFilled, CircleCloseFilled } from '@element-plus/icons-vue';
 import { useRoute } from 'vue-router'
 import { highlightCode } from '../../utils/shiki'
-import { extractHost, isIPv4 } from '~/utils/tools';
+import { extractHost, isIPv4 } from '../../utils/tools';
 const route = useRoute();
 const loading = ref(false);
 
@@ -66,10 +66,13 @@ curl ${config.v6OnlyAPI}
 curl ${config.DualStackAPI}
 `.trim();
 const html = ref('');
-const remoteAPI = ref(config.IPLocationAPI);
+const apiList = config.IPLocationAPIs
+const currentApiIndex = ref(0)
+const remoteAPI = computed(() => apiList[currentApiIndex.value].url)
 const ipAddress = ref('');
 const IPLocation = ref<IPLocationType>({});
 const UserIP = ref('');
+const error = ref('')
 const locationUrl = computed(() => remoteAPI.value + "v1/location/" + ipAddress.value);
 
 const { data: locationData, error: locationError, execute: executeLocation } = useFetch<IPLocationType>(locationUrl, {
@@ -81,18 +84,30 @@ watch(locationData, (newData) => {
   if (newData) {
     IPLocation.value = newData;
     loading.value = false;
+    error.value = '';
   }
 });
 
-watch(locationError, (newError) => {
+watch(locationError, async (newError) => {
   if (newError) {
     console.error('Error fetching IP location:', newError);
-    loading.value = false;
+    if (currentApiIndex.value < apiList.length - 1) {
+      const nextIndex = currentApiIndex.value + 1
+      error.value = `${(newError as any).message || '请求失败'}，正在重试 ${apiList[nextIndex].label}...`
+      currentApiIndex.value = nextIndex
+      await nextTick()
+      executeLocation()
+    } else {
+      error.value = '请求失败，请检查网络或稍后重试'
+      loading.value = false;
+    }
   }
 });
 
 function locateIP(IP: string){
+  currentApiIndex.value = 0
   ipAddress.value = IP;
+  error.value = ''
   loading.value = true;
   nextTick(() => {
     executeLocation();
@@ -142,6 +157,9 @@ onMounted(async () => {
       >
         查询
       </el-button>
+    </div>
+    <div v-if="error" class="error-message">
+      {{ error }}
     </div>
     <div class="location">
       <div class="ip-info" style="height: 40px;">

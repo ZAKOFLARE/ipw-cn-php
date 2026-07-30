@@ -2,7 +2,7 @@
 import { ref, onMounted, computed, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { config } from '../../config/index';
-import { extractHost, formatTime, formatSpeed, formatSize, getStatusCodeClass } from '~/utils/tools';
+import { extractHost, formatTime, formatSpeed, formatSize, getStatusCodeClass } from '../../utils/tools';
 
 
 const route = useRoute()

@@ -3,7 +3,7 @@ import { ref, onMounted, computed, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { CircleCheckFilled, CircleCloseFilled,InfoFilled } from '@element-plus/icons-vue';
 import { config } from '../../config/index';
-import { extractHost, formatTime, formatSpeed, getStatusCodeClass } from '~/utils/tools';
+import { extractHost, formatTime, formatSpeed, getStatusCodeClass } from '../../utils/tools';
 const route = useRoute()
 
 useHead({
@@ -62,7 +62,9 @@ interface SSLCheckItem {
   is_expired: boolean
   is_reachable: boolean
 }
-const remoteAPI = ref(config.apiBaseUrl)
+const apiList = config.apiBaseUrls
+const currentApiIndex = ref(0)
+const remoteAPI = computed(() => apiList[currentApiIndex.value].url)
 const tmpDomain = ref('https://www.zakoflare.com')
 const testDomain = ref('')
 const loading = ref(false)
@@ -79,14 +81,23 @@ watch(sslData, (newData) => {
   if (newData) {
     result.value = newData;
     loading.value = false;
+    error.value = '';
   }
 });
 
-watch(sslError, (newError) => {
+watch(sslError, async (newError) => {
   if (newError) {
     console.log(newError);
-    error.value = '请求失败，请检查域名或网络';
-    loading.value = false;
+    if (currentApiIndex.value < apiList.length - 1) {
+      const nextIndex = currentApiIndex.value + 1
+      error.value = `${(newError as any).message || '请求失败'}，正在重试 ${apiList[nextIndex].label}...`
+      currentApiIndex.value = nextIndex
+      await nextTick()
+      executeSSL()
+    } else {
+      error.value = '请求失败，请检查域名或网络';
+      loading.value = false;
+    }
   }
 });
 
@@ -104,6 +115,7 @@ function formatDate(dateString: string): string {
 
 function checkSSL() {
   testDomain.value = extractHost(tmpDomain.value)
+  currentApiIndex.value = 0
   loading.value = true
   error.value = ''
   result.value = null

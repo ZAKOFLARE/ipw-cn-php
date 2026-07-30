@@ -3,7 +3,7 @@ import { ref, onMounted, computed, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { config } from '../../config/index';
 import { isIPv6 } from 'is-ip';
-import { extractHost } from '~/utils/tools';
+import { extractHost } from '../../utils/tools';
 const route = useRoute()
 
 useHead({
@@ -173,7 +173,7 @@ onMounted(() => {
 <template>
   <div class="title">
     <header>
-      <h1>IPv6 Ping 测试</h1>
+      <h1>IPv6 TCPing 测试</h1>
       <p>多节点 TCPing 测试，检测服务器连通性和延迟</p>
     </header>
   </div>
