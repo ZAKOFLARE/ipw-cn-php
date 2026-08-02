@@ -8,7 +8,7 @@
 
 ## 前置条件
 
-[所在服务器已经开启 IPv6](/server/tencent_cloud_cvm_ipv6)。
+[所在服务器已经开启 IPv6](/doc/server/tencent_cloud_cvm_ipv6)。
 
 ## Nginx 开启 IPv6
 
@@ -51,9 +51,9 @@ tcp6       0      0 :::80                   :::*                    LISTEN      
 ```
 
 
-参考文档 [浏览器访问 IPv6 地址](/user/view_ipv6_adress_url)访问 IPv6 网站，验证是否访问成功。
+参考文档 [浏览器访问 IPv6 地址](/doc/user/view_ipv6_adress_url)访问 IPv6 网站，验证是否访问成功。
 
-如果访问失败，请检查 [安全组是否开放 IPv6 的 80 端口 入请求的访问策略](/server/website_enable_ipv6)。
+如果访问失败，请检查 [安全组是否开放 IPv6 的 80 端口 入请求的访问策略](/doc/server/website_enable_ipv6)。
 
 使用 curl 访问速度测试
 

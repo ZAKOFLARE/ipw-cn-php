@@ -55,6 +55,7 @@ type MMDBASNResult struct {
 type GeoCNResult struct {
 	DivisionCode string `json:"division_code"`
 	ISP          string `json:"isp"`
+	Type         string `json:"type"`
 	Region       string `json:"administrative_area,omitempty"`
 	City         string `json:"city,omitempty"`
 	District     string `json:"district,omitempty"`
@@ -232,6 +233,7 @@ func loadMMDB() error {
 		"geolite2_asn":  "GeoLite2-ASN.mmdb",
 		"geocn":         "GeoCN.mmdb",
 		"dbip_city":     "dbip-city-lite.mmdb",
+		"dbip_asn":      "dbip-asn-lite.mmdb",
 	}
 
 	mmdbDBs = make(map[string]*maxminddb.Reader)
@@ -263,6 +265,7 @@ func reloadMMDB() error {
 		"geolite2_asn":  "GeoLite2-ASN.mmdb",
 		"geocn":         "GeoCN.mmdb",
 		"dbip_city":     "dbip-city-lite.mmdb",
+		"dbip_asn":      "dbip-asn-lite.mmdb",
 	}
 
 	mmdbDBs = make(map[string]*maxminddb.Reader)
@@ -421,6 +424,33 @@ func searchMMDBASN(ip string) (*MMDBASNResult, error) {
 	}, nil
 }
 
+func searchDBIPASN(ip string) (*MMDBASNResult, error) {
+	mmdbMu.RLock()
+	defer mmdbMu.RUnlock()
+	db, ok := mmdbDBs["dbip_asn"]
+	if !ok {
+		return nil, fmt.Errorf("dbip_asn not loaded")
+	}
+
+	addr, err := netip.ParseAddr(ip)
+	if err != nil {
+		return nil, err
+	}
+
+	var record struct {
+		ASN uint32 `maxminddb:"autonomous_system_number"`
+		Org string `maxminddb:"autonomous_system_organization"`
+	}
+	if err := db.Lookup(addr).Decode(&record); err != nil {
+		return nil, err
+	}
+
+	return &MMDBASNResult{
+		ASN: fmt.Sprintf("AS%d", record.ASN),
+		Org: record.Org,
+	}, nil
+}
+
 func searchGeoCN(ip string) (*GeoCNResult, error) {
 	mmdbMu.RLock()
 	defer mmdbMu.RUnlock()
@@ -437,6 +467,7 @@ func searchGeoCN(ip string) (*GeoCNResult, error) {
 	var record struct {
 		DivisionCode uint32 `maxminddb:"division_code"`
 		ISP          string `maxminddb:"isp"`
+		Type         string `maxminddb:"type"`
 	}
 	if err := db.Lookup(addr).Decode(&record); err != nil {
 		return nil, err
@@ -445,6 +476,7 @@ func searchGeoCN(ip string) (*GeoCNResult, error) {
 	result := &GeoCNResult{
 		DivisionCode: fmt.Sprintf("%d", record.DivisionCode),
 		ISP:          record.ISP,
+		Type:         record.Type,
 	}
 
 	code := int(record.DivisionCode)
@@ -595,7 +627,7 @@ func Init(ghproxy string) {
 	}()
 }
 
-var allDatabases = []string{"ip2region", "qqwry", "maxmind_city", "maxmind_asn", "geocn", "dbip_city", "bilibili"}
+var allDatabases = []string{"ip2region", "qqwry", "maxmind_city", "maxmind_asn", "dbip_asn", "geocn", "dbip_city", "bilibili"}
 
 func SearchIP(ip string, databases ...string) map[string]interface{} {
 	if len(databases) == 0 {
@@ -654,6 +686,14 @@ func SearchIP(ip string, databases ...string) map[string]interface{} {
 				result["maxmind_asn"] = "error: " + err.Error()
 			} else {
 				result["maxmind_asn"] = asn
+			}
+
+		case "dbip_asn":
+			asn, err := searchDBIPASN(ip)
+			if err != nil {
+				result["dbip_asn"] = "error: " + err.Error()
+			} else {
+				result["dbip_asn"] = asn
 			}
 
 		case "geocn":

@@ -189,7 +189,7 @@ onMounted(async () => {
               <tr v-if="IPLocation.geocn && (IPLocation.geocn.administrative_area || IPLocation.geocn.city || IPLocation.geocn.district)">
                 <td class="table-label">GeoCN(仅中国大陆)</td>
                 <td class="table-value">{{ IPLocation.geocn?.administrative_area }}&nbsp;{{ IPLocation.geocn?.city }}&nbsp;{{ IPLocation.geocn?.district }}</td>
-                <td class="table-value">{{ IPLocation.geocn?.isp }}</td>
+                <td class="table-value">{{ IPLocation.geocn?.isp }}&nbsp{{IPLocation.geocn?.type}}</td>
               </tr>
               <tr v-if="IPLocation.maxmind_city && IPLocation.maxmind_asn && (IPLocation.maxmind_city.country || IPLocation.maxmind_city.city)">
                 <td class="table-label">Maxmind GEOLite2 City</td>
@@ -204,7 +204,7 @@ onMounted(async () => {
               <tr v-if="IPLocation.dbip_city && (IPLocation.dbip_city.administrative_area || IPLocation.dbip_city.city)">
                 <td class="table-label">DB-IP City</td>
                 <td class="table-value">{{ IPLocation.dbip_city?.country }}&nbsp;{{ IPLocation.dbip_city?.administrative_area }}&nbsp;{{ IPLocation.dbip_city?.city }}</td>
-                <td class="table-value">--</td>
+                <td class="table-value">{{IPLocation.dbip_asn?.org}}</td>
               </tr>
             </tbody>
           </table>

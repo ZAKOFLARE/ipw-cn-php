@@ -2,7 +2,7 @@
 
 IPv6网络开启成功后，可以访问 IPv6 网站资源，来体验下 IPv6 的魅力。
 
-不过目前 [国内纯 IPv6资源](/user/pure_ipv6_website) 比较少，目前网站支持 IPv6 的主流方式为 IPv4/IPv6双栈访问，毕竟要兼顾 IPv4 网络用户的访问需求。
+不过目前 [国内纯 IPv6资源](/doc/user/pure_ipv6_website) 比较少，目前网站支持 IPv6 的主流方式为 IPv4/IPv6双栈访问，毕竟要兼顾 IPv4 网络用户的访问需求。
 
 下面是整理的 IPv6 资源。
 

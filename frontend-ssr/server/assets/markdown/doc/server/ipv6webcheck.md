@@ -3,7 +3,7 @@
 -   [1 域名解析到 IPv6地址](#1-域名解析到-ipv6地址)
 -   [2 通过 IPv6 网络是否可以访问成功](#2-通过-ipv6-网络是否可以访问成功)
 
-在 [腾讯云 cvm 开启 IPv6](/server/tencent_cloud_cvm_ipv6) 中我们介绍了服务器如何开启 IPv6，接下来我们介绍下如何检查一个网站是否开启 IPv6。
+在 [腾讯云 cvm 开启 IPv6](/doc/server/tencent_cloud_cvm_ipv6) 中我们介绍了服务器如何开启 IPv6，接下来我们介绍下如何检查一个网站是否开启 IPv6。
 
 可以直接访问 [在线 IPv6 网站检测工具](https://ipw.wsmdn.top/ipv6webcheck/) 来确认一个网站是否开 IPv6 访问。 ![ipv6 webcheck](/doc/ipv6_webcheck.png)
 
@@ -20,7 +20,7 @@
 
 ## 2 通过 IPv6 网络是否可以访问成功
 
-如果网站直接监听在 IPv6 地址上，则可以在 IPv6 地址两侧加上 `[]`, 即可[访问 IPv6 网址](/user/view_ipv6_adress_url)。
+如果网站直接监听在 IPv6 地址上，则可以在 IPv6 地址两侧加上 `[]`, 即可[访问 IPv6 网址](/doc/user/view_ipv6_adress_url)。
 
 -   直接访问 IPv6 地址 （[IPv6 网站测速工具](https://ipw.wsmdn.top/ipv6speedtest)）
 

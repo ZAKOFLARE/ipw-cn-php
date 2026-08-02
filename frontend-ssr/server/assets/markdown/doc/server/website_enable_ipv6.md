@@ -23,7 +23,7 @@
 
 ### 前置条件
 
--   [服务器已开启 IPv6](/server/tencent_cloud_cvm_ipv6.html)
+-   [服务器已开启 IPv6](/doc/server/tencent_cloud_cvm_ipv6)
 
 ### 1.1 启动监听 IPv6 地址的 Nginx
 
@@ -76,11 +76,11 @@ Accept-Ranges: bytes
 
 ### 1.4 本地电脑验证 IPv6 访问
 
-如果 [本地网络已开启 IPv6访问](/user/enable_ipv6.html)，接下来参照 [浏览器访问 IPv6 地址](/user/view_ipv6_adress_url.html)，在本地电脑通过浏览器可以验证 IPv6 访问。
+如果 [本地网络已开启 IPv6访问](/doc/user/enable_ipv6)，接下来参照 [浏览器访问 IPv6 地址](/doc/user/view_ipv6_adress_url)，在本地电脑通过浏览器可以验证 IPv6 访问。
 
 ### 1.5 域名添加 IPv6 地址解析
 
-[给域名添加 IPv6 解析记录（AAAA）](/server/ipv6_domain_record.html)![IPv6 解析记录（AAAA)](/doc/ipv6_domain_resolve.png)
+[给域名添加 IPv6 解析记录（AAAA）](/doc/server/ipv6_domain_record)![IPv6 解析记录（AAAA)](/doc/ipv6_domain_resolve.png)
 
 添加完后可以通过 [IPv6 在线域名解析工具](https://ipw.wsmdn.top/dns/) 对其解析验证。
 
@@ -96,7 +96,7 @@ Accept-Ranges: bytes
 
 > 此处以 腾讯云容器服务为例，介绍如何开启 IPv6。
 
-参照文章 [腾讯云 cvm 开启 IPv6](/server/tencent_cloud_cvm_ipv6.html) ，提交 IPv6 内测申请。
+参照文章 [腾讯云 cvm 开启 IPv6](/doc/server/tencent_cloud_cvm_ipv6) ，提交 IPv6 内测申请。
 
 ### 2.1 创建 \`IPv6 NAT64\` 版本的 Ingress
 

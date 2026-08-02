@@ -9,6 +9,7 @@ RUN go mod download
 COPY main.go ./
 COPY webtest/ ./webtest/
 COPY ipdb/ ./ipdb/
+COPY ssrf/ ./ssrf/
 RUN go build -o main .
 
 # 运行阶段
