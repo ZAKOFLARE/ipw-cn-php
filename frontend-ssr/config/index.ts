@@ -27,6 +27,10 @@ const config = {
     ],
     IPLocationAPIs: [
         {
+            label: "中国 江苏 移动",
+            url: "https://cn-jiangsu.api-ipw.wsmdn.top/"
+        },
+        {
             label: "中国 四川 沙渠 电信[ZFC]",
             url: "https://cn2-sichuan.api-ipw.wsmdn.top/"
         }
