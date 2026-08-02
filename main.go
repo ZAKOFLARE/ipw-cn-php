@@ -32,12 +32,18 @@ func initHTTPClients() {
 	setTransport := func(network string) *http.Transport {
 		dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
 		return &http.Transport{
-			DialContext: func(ctx context.Context, _, addr string) (net.Conn, error) {
-				if ssrf.Enabled() {
-					host, port, err := net.SplitHostPort(addr)
-					if err != nil {
-						return nil, err
+		DialContext: func(ctx context.Context, _, addr string) (net.Conn, error) {
+			if ssrf.Enabled() {
+				host, port, err := net.SplitHostPort(addr)
+				if err != nil {
+					return nil, err
+				}
+				if ip := net.ParseIP(host); ip != nil {
+					if ssrf.IsPrivateIP(ip) {
+						slog.Warn("Blocked connection to private IP", "host", host)
+						return nil, fmt.Errorf("request to private/internal address is not allowed")
 					}
+				} else {
 					var dnsResult webtest.DNSResult
 					if network == "tcp4" {
 						dnsResult, err = webtest.ResolveARecord(host)
@@ -58,8 +64,9 @@ func initHTTPClients() {
 						addr = net.JoinHostPort(dnsResult.Record[0], port)
 					}
 				}
-				return dialer.DialContext(ctx, network, addr)
-			},
+			}
+			return dialer.DialContext(ctx, network, addr)
+		},
 			TLSClientConfig:    &tls.Config{InsecureSkipVerify: true},
 			DisableKeepAlives:  true,
 		}
@@ -199,6 +206,7 @@ type Setting struct {
 	Port         any    `json:"port"`
 	GHProxy      string `json:"gh-proxy"`
 	SINGLE_STACK string `json:"single-stack"`
+	CORS         string `json:"cors"`
 }
 
 func (s *Setting) PortString() string {
@@ -228,6 +236,8 @@ var (
 	V6Client     *resty.Client
 	V4Client     *resty.Client
 	IPDB         string
+	CORS         string
+	ACCEPT_DOMAINS []string
 )
 
 type websiteCacheEntry struct {
@@ -1078,6 +1088,7 @@ func readConfig() {
 	SINGLE_STACK = strings.ToLower(strings.TrimSpace(os.Getenv("SINGLE_STACK")))
 	DNS_SERVER = os.Getenv("DNS_SERVER")
 	IPDB = os.Getenv("IPDB")
+	CORS = os.Getenv("CORS")
 	ssrf.SetEnabled(os.Getenv("BLOCK_PRIVATE_IPS") != "false" && os.Getenv("BLOCK_PRIVATE_IPS") != "0")
 
 	// SINGLE_STACK is intentionally excluded: empty string is a valid value (dual-stack).
@@ -1103,8 +1114,14 @@ func readConfig() {
 	if IPDB == "" {
 		IPDB = viper.GetString("ipdb")
 	}
+	if CORS == "" {
+		CORS = viper.GetString("cors")
+	}
 	if PORTS == "" {
 		PORTS = "8080"
+	}
+	if CORS != "" {
+		ACCEPT_DOMAINS = strings.Split(CORS, ",")
 	}
 	slog.Info("SSRF protection initialized", "blockPrivateIPs", ssrf.Enabled())
 }
@@ -1119,7 +1136,13 @@ func main() {
 	slog.Info("Starting server", "port", PORTS, "gh_proxy", GH_PROXY, "single_stack", SINGLE_STACK, "dns_server", DNS_SERVER)
 
 	r := gin.Default()
-	r.Use(cors.Default())
+	if CORS != "" {
+		r.Use(cors.New(cors.Config{
+			AllowOrigins: ACCEPT_DOMAINS,
+		}))
+	} else {
+		r.Use(cors.Default())
+	}
 
 	r.GET("/v1/detail/*url", checkWebsiteHandler)
 	r.GET("/v1/ssl/*url", sslCheckHandler)

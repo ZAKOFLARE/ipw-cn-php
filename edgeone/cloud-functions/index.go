@@ -29,6 +29,7 @@ type Setting struct {
 	Port         any    `json:"port"`
 	GHProxy      string `json:"gh-proxy"`
 	SINGLE_STACK string `json:"single-stack"`
+	CORS         string `json:"cors"`
 }
 
 func (s *Setting) PortString() string {
@@ -55,6 +56,8 @@ var (
 	defaultPort  = fmt.Sprintf("%d", 5<<4)
 	V6Client     *resty.Client
 	V4Client     *resty.Client
+	CORS         string
+	ACCEPT_DOMAINS []string
 )
 
 func fakePerfectWebsiteResult(host string) *WebsiteCheckDetail {
@@ -191,24 +194,31 @@ func initHttpClient() {
 					if err != nil {
 						return nil, err
 					}
-					var dnsResult webtest.DNSResult
-					if network == "tcp4" {
-						dnsResult, err = webtest.ResolveARecord(host)
-					} else {
-						dnsResult, err = webtest.ResolveAAAARecord(host)
-					}
-					if err != nil {
-						return nil, err
-					}
-					for _, ipStr := range dnsResult.Record {
-						ip := net.ParseIP(ipStr)
-						if ip != nil && ssrf.IsPrivateIP(ip) {
-							slog.Warn("Blocked connection to private IP", "host", host, "ip", ip)
+					if ip := net.ParseIP(host); ip != nil {
+						if ssrf.IsPrivateIP(ip) {
+							slog.Warn("Blocked connection to private IP", "host", host)
 							return nil, fmt.Errorf("request to private/internal address is not allowed")
 						}
-					}
-					if len(dnsResult.Record) > 0 {
-						addr = net.JoinHostPort(dnsResult.Record[0], port)
+					} else {
+						var dnsResult webtest.DNSResult
+						if network == "tcp4" {
+							dnsResult, err = webtest.ResolveARecord(host)
+						} else {
+							dnsResult, err = webtest.ResolveAAAARecord(host)
+						}
+						if err != nil {
+							return nil, err
+						}
+						for _, ipStr := range dnsResult.Record {
+							ip := net.ParseIP(ipStr)
+							if ip != nil && ssrf.IsPrivateIP(ip) {
+								slog.Warn("Blocked connection to private IP", "host", host, "ip", ip)
+								return nil, fmt.Errorf("request to private/internal address is not allowed")
+							}
+						}
+						if len(dnsResult.Record) > 0 {
+							addr = net.JoinHostPort(dnsResult.Record[0], port)
+						}
 					}
 				}
 				return dialer.DialContext(ctx, network, addr)
@@ -1032,9 +1042,13 @@ func readConfig() {
 	}
 	SINGLE_STACK = os.Getenv("SINGLE_STACK")
 	DNS_SERVER = os.Getenv("DNS_SERVER")
+	CORS = os.Getenv("CORS")
 	ssrf.SetEnabled(os.Getenv("BLOCK_PRIVATE_IPS") != "false" && os.Getenv("BLOCK_PRIVATE_IPS") != "0")
 	if PORTS == "" {
 		PORTS = "8080"
+	}
+	if CORS != "" {
+		ACCEPT_DOMAINS = strings.Split(CORS, ",")
 	}
 	slog.Info("SSRF protection initialized", "blockPrivateIPs", ssrf.Enabled())
 }
@@ -1045,7 +1059,13 @@ func main() {
 	webtest.SetDNSServer(DNS_SERVER)
 	slog.Info("Starting server", "port", PORTS, "single_stack", SINGLE_STACK)
 	r := gin.Default()
-	r.Use(cors.Default())
+	if CORS != "" {
+		r.Use(cors.New(cors.Config{
+			AllowOrigins: ACCEPT_DOMAINS,
+		}))
+	} else {
+		r.Use(cors.Default())
+	}
 
 	r.GET("/v1/detail/*url", checkWebsiteHandler)
 	r.GET("/v1/ssl/*url", sslCheckHandler)

@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"strings"
 	"time"
+
+	"lemon-ipw/ssrf"
 )
 
 // TCPingResult 包含 TCP 连接测试的结果
@@ -33,22 +36,52 @@ type TCPingStats struct {
 
 // resolveHost 将主机名解析为指定协议版本的 IP 地址
 // version 参数支持 "v4"（IPv4）和 "v6"（IPv6）
+// 如果 host 已经是 IP 地址（可带 []），直接返回，跳过 DNS 解析
 func resolveHost(host string, version string) (string, error) {
-	ips, err := net.LookupIP(host)
-	if err != nil {
-		return "", fmt.Errorf("DNS lookup failed: %w", err)
-	}
-
-	for _, ip := range ips {
+	cleanHost := strings.Trim(host, "[]")
+	if ip := net.ParseIP(cleanHost); ip != nil {
 		if version == "v4" && ip.To4() != nil {
 			return ip.String(), nil
 		}
-		if version == "v6" && ip.To4() == nil && ip.To16() != nil {
+		if version == "v6" && ip.To4() == nil {
 			return ip.String(), nil
+		}
+		return "", fmt.Errorf("host %s is not a %s address", host, version)
+	}
+
+	var ipStr string
+	var err error
+
+	if version == "v4" {
+		var result DNSResult
+		result, err = ResolveARecord(host)
+		if err != nil {
+			return "", fmt.Errorf("DNS lookup failed: %w", err)
+		}
+		if len(result.Record) == 0 {
+			return "", fmt.Errorf("no %s address found for %s", version, host)
+		}
+		ipStr = result.Record[0]
+	} else {
+		var result DNSResult
+		result, err = ResolveAAAARecord(host)
+		if err != nil {
+			return "", fmt.Errorf("DNS lookup failed: %w", err)
+		}
+		if len(result.Record) == 0 {
+			return "", fmt.Errorf("no %s address found for %s", version, host)
+		}
+		ipStr = result.Record[0]
+	}
+
+	if ssrf.Enabled() {
+		ip := net.ParseIP(ipStr)
+		if ip != nil && ssrf.IsPrivateIP(ip) {
+			return "", fmt.Errorf("connection to private/internal address %s is not allowed", ipStr)
 		}
 	}
 
-	return "", fmt.Errorf("no %s address found for %s", version, host)
+	return ipStr, nil
 }
 
 // TCPing 执行单次 TCP 连接测试
