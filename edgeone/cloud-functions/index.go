@@ -1059,13 +1059,13 @@ func main() {
 	webtest.SetDNSServer(DNS_SERVER)
 	slog.Info("Starting server", "port", PORTS, "single_stack", SINGLE_STACK)
 	r := gin.Default()
-	if CORS != "" {
-		r.Use(cors.New(cors.Config{
-			AllowOrigins: ACCEPT_DOMAINS,
-		}))
-	} else {
-		r.Use(cors.Default())
+	corsConfig := cors.DefaultConfig()
+	if len(ACCEPT_DOMAINS) > 0{
+		corsConfig.AllowOrigins = ACCEPT_DOMAINS
+	}else{
+		corsConfig.AllowAllOrigins = true
 	}
+	r.Use(cors.New(corsConfig))
 
 	r.GET("/v1/detail/*url", checkWebsiteHandler)
 	r.GET("/v1/ssl/*url", sslCheckHandler)
