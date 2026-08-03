@@ -95,6 +95,7 @@ go mod download
 #   "gh-proxy": "https://fastgit.cc/",
 #   "single-stack": "",       # "ipv4" 或 "ipv6" 仅启用单栈
 #   "dns-server": ""          # 自定义 DNS 服务器
+#   "cors": ""                # 允许的请求来源，详见https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Guides/CORS
 # }
 
 # 运行
@@ -164,6 +165,7 @@ docker run -p 8080:8080 -v $(pwd)/setting.json:/app/setting.json lemon-ipw
 | `gh-proxy` | `GH_PROXY` | `""` | GitHub 文件代理（用于下载数据库） |
 | `single-stack` | `SINGLE_STACK` | `""` | 单栈模式：`ipv4` 或 `ipv6` |
 | `dns-server` | `DNS_SERVER` | `119.28.28.28:53` | DNS 服务器地址 |
+| cors          |  CORS|""|允许的请求来源|
 
 ### 前端配置
 
