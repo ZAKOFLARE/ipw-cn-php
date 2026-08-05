@@ -1,0 +1,8 @@
+{
+    "port": 80,
+    "gh-proxy": "",
+    "single-stack": "ipv4",
+    "dns-server": "1.1.1.1:53",
+    "block-private-ips": true,
+    "cors": "https://zfc.seven-cloud.cn"
+}
