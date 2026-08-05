@@ -1,0 +1,21 @@
+{
+    "name": "lemon/ipw-php",
+    "description": "Lemon IPW PHP backend - ipw.cn replacement (website check / SSL / DNS / TCPing / speed test)",
+    "type": "project",
+    "license": "GPL-3.0-only",
+    "require": {
+        "php": ">=8.2",
+        "ext-curl": "*",
+        "ext-sockets": "*",
+        "ext-openssl": "*",
+        "ext-json": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}
