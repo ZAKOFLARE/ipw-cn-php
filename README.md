@@ -1,4 +1,4 @@
-原始README.MD请前往https://github.com/nomdn/ipw-cn查看
+原始README.MD请前往 https://github.com/nomdn/ipw-cn 查看
 本篇仅介绍其在虚拟主机中部署的重要注意事项.
 1,域名的根绑定文件夹为/public
 
