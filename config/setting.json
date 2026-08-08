@@ -1,8 +1,9 @@
 {
     "port": 80,
     "gh-proxy": "",
-    "single-stack": "",
-    "dns-server": "",
+    "single-stack": "ipv4",
+    "dns-server": "119.29.29.29:53",
     "block-private-ips": true,
-    "cors": ""
+    "cors": "",
+    "counter-url": "https://api.2409178.xyz/data/zakoflare/web.php?add=1"
 }

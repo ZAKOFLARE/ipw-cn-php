@@ -13,6 +13,7 @@ use App\Service\SpeedTestService;
 use App\Service\TcpingService;
 use App\Service\WebsiteCheckService;
 use App\Support\UrlHelper;
+use App\Analytics\Counter;
 use RuntimeException;
 
 /**
@@ -27,13 +28,13 @@ final class ApiController
     public function detail(string $url): array
     {
         $url = UrlHelper::normalizeUrl($url);
-        return (new WebsiteCheckService($this->config))->check($url);
+        return (new WebsiteCheckService($this->config))->check($url, 'detail');
     }
 
     public function ssl(string $url): array
     {
         $url = UrlHelper::normalizeUrl($url);
-        return (new SslCheckService($this->config))->check($url);
+        return (new SslCheckService($this->config))->check($url, 'ssl');
     }
 
     public function speed(string $version, string $url): array
@@ -67,7 +68,7 @@ final class ApiController
             exit;
         }
 
-        return (new SpeedTestService($this->config))->test($url, $version);
+        return (new SpeedTestService($this->config))->test($url, $version, 'speed');
     }
 
     public function tcping(string $ip): array
@@ -89,7 +90,7 @@ final class ApiController
             $count = $n;
         }
 
-        return (new TcpingService($this->config))->ping($ip, $port, $count);
+        return (new TcpingService($this->config))->ping($ip, $port, $count, 'tcping');
     }
 
     public function dns(string $type, string $domain): array
@@ -109,7 +110,10 @@ final class ApiController
 
         try {
             $client = new DnsClient($this->config->dnsServer);
-            return $client->query($host, $typeUpper);
+            $result = $client->query($host, $typeUpper);
+            // DNS 无缓存，每次查询都是真实数据 → 直接计数
+            Counter::queue('dns');
+            return $result;
         } catch (RuntimeException $e) {
             Response::json(['error' => $e->getMessage()], 500);
             exit;

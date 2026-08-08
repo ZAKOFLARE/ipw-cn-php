@@ -9,6 +9,7 @@ use App\Http\Response;
 use App\Http\Router;
 use App\Network\DnsClient;
 use App\Security\Ssrf;
+use App\Analytics\Counter;
 
 /**
  * Lemon IPW PHP 后端入口（FPM / php -S 通用）。
@@ -40,6 +41,9 @@ $config = Config::load($root);
 Ssrf::setEnabled($config->blockPrivateIps);
 Ssrf::setDnsClient(new DnsClient($config->dnsServer));
 
+// 统计计数（配置 counter-url 后启用）
+Counter::configure($config->counterUrl);
+
 // CORS（对齐 Go 版 gin-contrib/cors 的 AllowAllOrigins 或白名单模式）
 handleCors($config);
 
@@ -63,6 +67,9 @@ try {
 } catch (Throwable $e) {
     Response::json(['error' => $e->getMessage()], 500);
 }
+
+// 响应已输出：异步执行真实业务数据的计数（失败/超时不影响主流程，异常内部吞掉）
+Counter::flush();
 
 /**
  * CORS 处理。

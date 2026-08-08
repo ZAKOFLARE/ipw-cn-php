@@ -15,7 +15,12 @@ namespace App\Cache;
  */
 final class InFlightGuard
 {
-    public static function run(string $cacheKey, int $ttl, callable $producer, float $waitSeconds = 5.0): mixed
+    /**
+     * @param callable $producer       探测逻辑（仅执行一次）
+     * @param callable|null $onProduced 仅当本请求真正执行了 producer（非缓存命中）时回调
+     * @param float $waitSeconds       未抢到锁时的等待上限（秒）
+     */
+    public static function run(string $cacheKey, int $ttl, callable $producer, ?callable $onProduced = null, float $waitSeconds = 5.0): mixed
     {
         $cache = new FileCache();
 
@@ -29,6 +34,9 @@ final class InFlightGuard
             // 无法建锁文件：直接执行
             $value = $producer();
             $cache->set($cacheKey, $value, $ttl);
+            if ($onProduced !== null) {
+                $onProduced();
+            }
             return $value;
         }
 
@@ -40,6 +48,9 @@ final class InFlightGuard
                 }
                 $value = $producer();
                 $cache->set($cacheKey, $value, $ttl);
+                if ($onProduced !== null) {
+                    $onProduced();
+                }
                 return $value;
             } finally {
                 flock($fp, LOCK_UN);
@@ -61,6 +72,9 @@ final class InFlightGuard
         // 超时兜底：自行执行
         $value = $producer();
         $cache->set($cacheKey, $value, $ttl);
+        if ($onProduced !== null) {
+            $onProduced();
+        }
         return $value;
     }
 

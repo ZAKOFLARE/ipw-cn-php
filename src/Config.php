@@ -17,6 +17,7 @@ final class Config
     public bool $blockPrivateIps;
     /** @var string[] */
     public array $acceptDomains = [];
+    public string $counterUrl = '';
 
     public static function load(string $rootDir): self
     {
@@ -50,6 +51,8 @@ final class Config
         if ($cors !== '') {
             $config->acceptDomains = array_values(array_filter(array_map('trim', explode(',', $cors))));
         }
+
+        $config->counterUrl = getenv('COUNTER_URL') ?: ($values['counter-url'] ?? '');
 
         return $config;
     }

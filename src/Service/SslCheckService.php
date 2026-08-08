@@ -10,6 +10,7 @@ use App\Network\DnsClient;
 use App\Network\HttpProbe;
 use App\Security\Ssrf;
 use App\Support\UrlHelper;
+use App\Analytics\Counter;
 use RuntimeException;
 
 /**
@@ -26,7 +27,10 @@ final class SslCheckService
     {
     }
 
-    public function check(string $url): array
+    /**
+     * @param string $counterPage 统计端点标识（非空时仅"非缓存命中"的真实探测计数）
+     */
+    public function check(string $url, string $counterPage = ''): array
     {
         $cacheKey = 'ssl:' . $url;
         return InFlightGuard::run($cacheKey, self::CACHE_TTL, function () use ($url, $cacheKey) {
@@ -35,7 +39,7 @@ final class SslCheckService
                 (new \App\Cache\FileCache())->set($cacheKey, $result, self::FAIL_CACHE_TTL);
             }
             return $result;
-        });
+        }, $counterPage !== '' ? static fn () => Counter::queue($counterPage) : null);
     }
 
     private function doCheck(string $url): array

@@ -8,6 +8,7 @@ use App\Cache\InFlightGuard;
 use App\Config;
 use App\Network\DnsClient;
 use App\Network\HttpProbe;
+use App\Analytics\Counter;
 use RuntimeException;
 
 /**
@@ -22,10 +23,18 @@ final class SpeedTestService
     {
     }
 
-    public function test(string $url, string $version): array
+    /**
+     * @param string $counterPage 统计端点标识（非空时仅"非缓存命中"的真实探测计数）
+     */
+    public function test(string $url, string $version, string $counterPage = ''): array
     {
         $cacheKey = 'speed:' . $url . ':' . $version;
-        return InFlightGuard::run($cacheKey, self::CACHE_TTL, fn () => $this->doTest($url, $version));
+        return InFlightGuard::run(
+            $cacheKey,
+            self::CACHE_TTL,
+            fn () => $this->doTest($url, $version),
+            $counterPage !== '' ? static fn () => Counter::queue($counterPage) : null
+        );
     }
 
     private function doTest(string $url, string $version): array

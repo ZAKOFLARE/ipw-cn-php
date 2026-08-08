@@ -7,6 +7,7 @@ namespace App\Service;
 use App\Cache\InFlightGuard;
 use App\Config;
 use App\Network\TcpPinger;
+use App\Analytics\Counter;
 
 /**
  * TCPing：对应 Go 版 pingHandler。
@@ -20,10 +21,18 @@ final class TcpingService
     {
     }
 
-    public function ping(string $host, int $port, int $count): array
+    /**
+     * @param string $counterPage 统计端点标识（非空时仅"非缓存命中"的真实探测计数）
+     */
+    public function ping(string $host, int $port, int $count, string $counterPage = ''): array
     {
         $cacheKey = 'tcping:' . $host . ':' . $port . ':' . $count;
-        return InFlightGuard::run($cacheKey, self::CACHE_TTL, fn () => $this->doPing($host, $port, $count));
+        return InFlightGuard::run(
+            $cacheKey,
+            self::CACHE_TTL,
+            fn () => $this->doPing($host, $port, $count),
+            $counterPage !== '' ? static fn () => Counter::queue($counterPage) : null
+        );
     }
 
     private function doPing(string $host, int $port, int $count): array
