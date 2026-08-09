@@ -18,6 +18,7 @@ final class Config
     /** @var string[] */
     public array $acceptDomains = [];
     public string $counterUrl = '';
+    public string $dnssecServer = '';
 
     public static function load(string $rootDir): self
     {
@@ -53,6 +54,8 @@ final class Config
         }
 
         $config->counterUrl = getenv('COUNTER_URL') ?: ($values['counter-url'] ?? '');
+
+        $config->dnssecServer = getenv('DNSSEC_SERVER') ?: ($values['dnssec-server'] ?? '');
 
         return $config;
     }

@@ -14,15 +14,18 @@ use RuntimeException;
 final class DnsClient
 {
     public const TYPE_MAP = [
-        'A'    => 1,
-        'NS'   => 2,
-        'CNAME'=> 5,
-        'PTR'  => 12,
-        'MX'   => 15,
-        'TXT'  => 16,
-        'AAAA' => 28,
-        'SRV'  => 33,
-        'CAA'  => 257,
+        'A'      => 1,
+        'NS'     => 2,
+        'CNAME'  => 5,
+        'PTR'    => 12,
+        'MX'     => 15,
+        'TXT'    => 16,
+        'AAAA'   => 28,
+        'SRV'    => 33,
+        'DS'     => 43,
+        'RRSIG'  => 46,
+        'DNSKEY' => 48,
+        'CAA'    => 257,
     ];
 
     private string $serverIp;
@@ -69,6 +72,83 @@ final class DnsClient
             'ttl'      => $ttl,
             'duration' => $duration,
         ];
+    }
+
+    /**
+     * 原始查询（DNSSEC 专用）：带 EDNS0 DO 位，返回所有 answer 记录的原始字节，
+     * 供 DnssecVerifier 解析 DNSKEY/RRSIG/DS 并重建签名数据流。
+     *
+     * @return array{rcode: int, answers: array<int, array{type: int, rdata: string, rdataOffset: int}>, msg: string, duration: float}
+     */
+    public function queryRaw(string $domain, int $qtype): array
+    {
+        $start = microtime(true);
+        $packet = $this->buildQueryEdns($domain, $qtype);
+        $response = $this->exchange($packet);
+        $duration = round((microtime(true) - $start) * 1000, 3);
+
+        $flags = unpack('n', substr($response, 2, 2))[1];
+        $rcode = $flags & 0x0F;
+
+        return [
+            'rcode'    => $rcode,
+            'answers'  => $this->parseRawAnswers($response),
+            'msg'      => $response,
+            'duration' => $duration,
+        ];
+    }
+
+    /**
+     * 构造带 EDNS0 OPT（DO 位）的查询报文。
+     */
+    private function buildQueryEdns(string $domain, int $qtype): string
+    {
+        $id = random_int(0, 0xFFFF);
+        // ARCOUNT=1：附加 OPT 伪记录
+        $header = pack('n6', $id, 0x0100, 1, 0, 0, 1);
+        $question = $this->encodeName($domain) . pack('n2', $qtype, 1);
+        // NAME=root(0x00), TYPE=OPT(41), CLASS=payload(4096), TTL: DO bit=0x8000, RDLEN=0
+        $opt = "\x00" . pack('n', 41) . pack('n', 4096) . pack('N', 0x8000) . pack('n', 0);
+        return $header . $question . $opt;
+    }
+
+    /**
+     * 解析响应中的所有 answer 记录（保留原始 rdata 字节与偏移，供压缩指针解码）。
+     *
+     * @return array<int, array{type: int, rdata: string, rdataOffset: int}>
+     */
+    private function parseRawAnswers(string $msg): array
+    {
+        $qdCount = unpack('n', substr($msg, 4, 2))[1];
+        $anCount = unpack('n', substr($msg, 6, 2))[1];
+
+        $offset = 12;
+        for ($i = 0; $i < $qdCount; $i++) {
+            $offset = $this->skipName($msg, $offset);
+            $offset += 4;
+        }
+
+        $answers = [];
+        for ($i = 0; $i < $anCount; $i++) {
+            $offset = $this->skipName($msg, $offset);
+            if ($offset + 10 > strlen($msg)) {
+                break;
+            }
+            $fields = unpack('ntype/nclass/Nttl/nrdlen', substr($msg, $offset, 10));
+            $offset += 10;
+            $rdlen = $fields['rdlen'];
+            if ($offset + $rdlen > strlen($msg)) {
+                break;
+            }
+            $answers[] = [
+                'type'        => $fields['type'],
+                'rdata'       => substr($msg, $offset, $rdlen),
+                'rdataOffset' => $offset,
+            ];
+            $offset += $rdlen;
+        }
+
+        return $answers;
     }
 
     /**
@@ -301,7 +381,7 @@ final class DnsClient
      * 从消息中解码名字（支持压缩指针）。$offset 为引用，读取后前移。
      * 指针的跳转位置以 12 字节 header 为基址计算（DNS 压缩规范）。
      */
-    private function decodeName(string $msg, int &$offset): string
+    public function decodeName(string $msg, int &$offset): string
     {
         $labels = [];
         $len = strlen($msg);

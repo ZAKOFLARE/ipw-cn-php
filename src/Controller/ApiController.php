@@ -8,6 +8,7 @@ use App\Config;
 use App\Http\Request;
 use App\Http\Response;
 use App\Network\DnsClient;
+use App\Service\DnssecService;
 use App\Service\SslCheckService;
 use App\Service\SpeedTestService;
 use App\Service\TcpingService;
@@ -118,5 +119,17 @@ final class ApiController
             Response::json(['error' => $e->getMessage()], 500);
             exit;
         }
+    }
+
+    public function dnssec(string $domain): array
+    {
+        if ($domain === '') {
+            Response::json(['error' => 'Domain parameter is required'], 400);
+            exit;
+        }
+        // Go 版 ResolveDNSSEC 不返回 error（失败写入 validation 字段），总是 200 结果
+        $result = (new DnssecService($this->config))->check($domain);
+        Counter::queue('dnssec');
+        return $result;
     }
 }

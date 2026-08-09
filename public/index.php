@@ -55,6 +55,7 @@ $router->get('~^/v1/detail/(?<url>.+)$~', static fn (array $p): array => $api->d
 $router->get('~^/v1/ssl/(?<url>.+)$~', static fn (array $p): array => $api->ssl($p['url']));
 $router->get('~^/v1/tcping/(?<ip>[^/]+)$~', static fn (array $p): array => $api->tcping($p['ip']));
 $router->get('~^/v1/dns/(?<type>[^/]+)/(?<domain>.+)$~', static fn (array $p): array => $api->dns($p['type'], $p['domain']));
+$router->get('~^/v1/dnssec/(?<domain>.*)$~', static fn (array $p): array => $api->dnssec($p['domain']));
 $router->get('~^/v1/speed/(?<version>[^/]+)/(?<url>.+)$~', static fn (array $p): array => $api->speed($p['version'], $p['url']));
 
 try {
