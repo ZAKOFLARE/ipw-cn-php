@@ -13,6 +13,7 @@ use App\Service\SslCheckService;
 use App\Service\SpeedTestService;
 use App\Service\TcpingService;
 use App\Service\WebsiteCheckService;
+use App\Service\WhoisService;
 use App\Support\UrlHelper;
 use App\Analytics\Counter;
 use RuntimeException;
@@ -131,5 +132,15 @@ final class ApiController
         $result = (new DnssecService($this->config))->check($domain);
         Counter::queue('dnssec');
         return $result;
+    }
+
+    public function whois(string $domain): array
+    {
+        if ($domain === '') {
+            Response::json(['error' => 'Domain parameter is required'], 400);
+            exit;
+        }
+        // Go 版 QueryWhois 不返回 error（失败写入结果 error 字段），总是 200 结果
+        return (new WhoisService($this->config))->check($domain);
     }
 }
