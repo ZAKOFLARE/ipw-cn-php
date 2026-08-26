@@ -29,4 +29,23 @@ final class Request
         $value = $_GET[$key] ?? null;
         return $value === null ? $default : (string) $value;
     }
+
+    /**
+     * 读取 Authorization 头（Bearer token 原样）。
+     * 兼容 FPM/CGI 下 Authorization 头被吞的情况：
+     * HTTP_AUTHORIZATION → REDIRECT_HTTP_AUTHORIZATION → getallheaders()。
+     */
+    public static function bearerToken(): string
+    {
+        $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+        if ($auth === '' && function_exists('getallheaders')) {
+            foreach (getallheaders() as $name => $value) {
+                if (strcasecmp((string) $name, 'Authorization') === 0) {
+                    $auth = (string) $value;
+                    break;
+                }
+            }
+        }
+        return $auth;
+    }
 }

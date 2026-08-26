@@ -19,6 +19,10 @@ final class Config
     public array $acceptDomains = [];
     public string $counterUrl = '';
     public string $dnssecServer = '';
+    public string $accessToken = '';
+    public string $nodeId = '';
+    /** @var array<string,string> 自定义错误页（状态码字符串 → 重定向 URL 或响应内容），空 = 不自定义 */
+    public array $errorPages = [];
 
     public static function load(string $rootDir): self
     {
@@ -56,6 +60,26 @@ final class Config
         $config->counterUrl = getenv('COUNTER_URL') ?: ($values['counter-url'] ?? '');
 
         $config->dnssecServer = getenv('DNSSEC_SERVER') ?: ($values['dnssec-server'] ?? '');
+
+        // 节点鉴权与身份：access-token 非空时 /v1 接口要求 Bearer；node-id 用于计数/日志区分节点
+        $config->accessToken = getenv('ACCESS_TOKEN') ?: ($values['access-token'] ?? '');
+        $config->nodeId = getenv('NODE_ID') ?: ($values['node-id'] ?? '');
+
+        // 自定义错误页：error-pages（env ERROR_PAGES 为 JSON 字符串，键=状态码，值=重定向 URL 或响应内容）
+        $errorPages = null;
+        if (($epEnv = getenv('ERROR_PAGES')) !== false && $epEnv !== '') {
+            $errorPages = json_decode($epEnv, true);
+        } elseif (isset($values['error-pages'])) {
+            $errorPages = $values['error-pages'];
+        }
+        if (is_array($errorPages)) {
+            foreach ($errorPages as $code => $body) {
+                $body = (string) $body;
+                if ($body !== '') {
+                    $config->errorPages[(string) $code] = $body;
+                }
+            }
+        }
 
         return $config;
     }

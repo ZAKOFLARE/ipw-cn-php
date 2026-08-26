@@ -117,7 +117,7 @@ final class ApiController
             Counter::queue('dns');
             return $result;
         } catch (RuntimeException $e) {
-            Response::json(['error' => $e->getMessage()], 500);
+            Response::error(500, $e->getMessage());
             exit;
         }
     }

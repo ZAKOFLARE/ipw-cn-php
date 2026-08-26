@@ -23,14 +23,17 @@ final class Counter
     /** @var array<string, true> 本请求内待计数的端点（键去重） */
     private static array $queue = [];
     private static string $baseUrl = '';
+    private static string $nodeId = '';
     private static bool $ready = false;
 
     /**
      * 配置计数接口地址（为空则关闭计数）。
+     * $nodeId 非空时作为 node 参数随每次计数上报，用于区分节点。
      */
-    public static function configure(string $baseUrl): void
+    public static function configure(string $baseUrl, string $nodeId = ''): void
     {
         self::$baseUrl = $baseUrl;
+        self::$nodeId = $nodeId;
         self::$ready = $baseUrl !== '';
     }
 
@@ -91,9 +94,16 @@ final class Counter
     private static function send(string $page): bool
     {
         $url = self::$baseUrl;
+        $extra = [];
         if ($page !== '') {
+            $extra[] = 'page=' . rawurlencode($page);
+        }
+        if (self::$nodeId !== '') {
+            $extra[] = 'node=' . rawurlencode(self::$nodeId);
+        }
+        if ($extra !== []) {
             $sep = str_contains($url, '?') ? '&' : '?';
-            $url .= $sep . 'page=' . rawurlencode($page);
+            $url .= $sep . implode('&', $extra);
         }
 
         $ch = curl_init($url);

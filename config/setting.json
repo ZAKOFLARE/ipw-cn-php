@@ -6,5 +6,8 @@
     "block-private-ips": true,
     "cors": "",
     "counter-url": "https://api.2409178.xyz/data/zakoflare/web.php?add=1",
-    "dnssec-server": "8.8.8.8:53,9.9.9.9:53"
+    "dnssec-server": "8.8.8.8:53,9.9.9.9:53",
+    "access-token": "",
+    "node-id": "",
+    "error-pages": {}
 }

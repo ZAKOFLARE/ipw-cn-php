@@ -37,15 +37,26 @@ if (is_file($autoload)) {
 
 $config = Config::load($root);
 
+// 注入自定义错误页（状态码 → 响应内容），后续 error() 统一套用
+Response::setErrorPages($config->errorPages);
+
 // 初始化安全与网络基础组件
 Ssrf::setEnabled($config->blockPrivateIps);
 Ssrf::setDnsClient(new DnsClient($config->dnsServer));
 
-// 统计计数（配置 counter-url 后启用）
-Counter::configure($config->counterUrl);
+// 统计计数（配置 counter-url 后启用；node-id 非空时随计数上报用于区分节点）
+Counter::configure($config->counterUrl, $config->nodeId);
 
 // CORS（对齐 Go 版 gin-contrib/cors 的 AllowAllOrigins 或白名单模式）
 handleCors($config);
+
+// access-token 鉴权（对齐 Go 版 tokenCheck）：仅 /v1 路径，配置非空时启用
+if ($config->accessToken !== '' && str_starts_with(Request::path(), '/v1')) {
+    if (Request::bearerToken() !== 'Bearer ' . $config->accessToken) {
+        Response::error(418, 'Unauthorized');
+        exit;
+    }
+}
 
 $router = new Router();
 $api = new ApiController($config);
@@ -62,12 +73,12 @@ $router->get('~^/v1/speed/(?<version>[^/]+)/(?<url>.+)$~', static fn (array $p):
 try {
     $result = $router->dispatch(Request::path());
     if ($result === null) {
-        Response::json(['error' => 'Not Found'], 404);
+        Response::error(404, 'Not Found');
     } else {
         Response::json($result);
     }
 } catch (Throwable $e) {
-    Response::json(['error' => $e->getMessage()], 500);
+    Response::error(500, $e->getMessage());
 }
 
 // 响应已输出：异步执行真实业务数据的计数（失败/超时不影响主流程，异常内部吞掉）
