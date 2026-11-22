@@ -8,6 +8,8 @@ use App\Config;
 use App\Http\Request;
 use App\Http\Response;
 use App\Network\DnsClient;
+use App\Network\ReqResolve;
+use App\Security\Ssrf;
 use App\Service\DnssecService;
 use App\Service\SslCheckService;
 use App\Service\SpeedTestService;
@@ -16,6 +18,7 @@ use App\Service\WebsiteCheckService;
 use App\Service\WhoisService;
 use App\Support\UrlHelper;
 use App\Analytics\Counter;
+use InvalidArgumentException;
 use RuntimeException;
 
 /**
@@ -27,20 +30,41 @@ final class ApiController
     {
     }
 
+    /**
+     * 解析请求级解析参数（dns/dns4/dns6、resolve/resolve4/resolve6），并把配置注入 SSRF 预检，
+     * 使预检与真正拨号读同一份解析配置（对应 Go 版 ParseReqResolve + InstallSSRFResolver）。
+     *
+     * 参数存在但全部非法时返回 400，避免「看起来指定了、实际按默认跑」。
+     */
+    private function requestResolve(): ReqResolve
+    {
+        try {
+            $req = ReqResolve::fromQuery(static fn (string $key): ?string => Request::query($key));
+        } catch (InvalidArgumentException $e) {
+            Response::json(['error' => $e->getMessage()], 400);
+            exit;
+        }
+        Ssrf::setRequestResolve($req);
+        return $req;
+    }
+
     public function detail(string $url): array
     {
+        $req = $this->requestResolve();
         $url = UrlHelper::normalizeUrl($url);
-        return (new WebsiteCheckService($this->config))->check($url, 'detail');
+        return (new WebsiteCheckService($this->config, $req))->check($url, 'detail');
     }
 
     public function ssl(string $url): array
     {
+        $req = $this->requestResolve();
         $url = UrlHelper::normalizeUrl($url);
-        return (new SslCheckService($this->config))->check($url, 'ssl');
+        return (new SslCheckService($this->config, $req))->check($url, 'ssl');
     }
 
     public function speed(string $version, string $url): array
     {
+        $req = $this->requestResolve();
         $url = UrlHelper::normalizeUrl($url);
 
         // 校验请求版本与 SINGLE_STACK 配置匹配（对齐 Go 版）
@@ -70,11 +94,12 @@ final class ApiController
             exit;
         }
 
-        return (new SpeedTestService($this->config))->test($url, $version, 'speed');
+        return (new SpeedTestService($this->config, $req))->test($url, $version, 'speed');
     }
 
     public function tcping(string $ip): array
     {
+        $req = $this->requestResolve();
         $port = (int) (Request::query('port', '80'));
         if ($port < 1 || $port > 65535) {
             Response::json(['error' => 'Invalid port number'], 400);
@@ -92,11 +117,13 @@ final class ApiController
             $count = $n;
         }
 
-        return (new TcpingService($this->config))->ping($ip, $port, $count, 'tcping');
+        return (new TcpingService($this->config, $req))->ping($ip, $port, $count, 'tcping');
     }
 
     public function dns(string $type, string $domain): array
     {
+        // dns 拨测只接 dns*（问的就是真实解析结果，resolve* 会自相矛盾）
+        $req = $this->requestResolve();
         $parsed = UrlHelper::parse($domain);
         if ($parsed === null) {
             Response::json(['error' => 'Invalid domain'], 400);
@@ -110,8 +137,12 @@ final class ApiController
             exit;
         }
 
+        // 按 qtype 选栈：a→dns4|dns，aaaa→dns6|dns，其余→dns
+        $stack = $typeUpper === 'A' ? 'ipv4' : ($typeUpper === 'AAAA' ? 'ipv6' : '');
+        $servers = $req->servers($stack);
+
         try {
-            $client = new DnsClient($this->config->dnsServer);
+            $client = new DnsClient($servers !== [] ? $servers : $this->config->dnsServer);
             $result = $client->query($host, $typeUpper);
             // DNS 无缓存，每次查询都是真实数据 → 直接计数
             Counter::queue('dns');

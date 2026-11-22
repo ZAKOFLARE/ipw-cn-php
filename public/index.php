@@ -7,7 +7,6 @@ use App\Controller\ApiController;
 use App\Http\Request;
 use App\Http\Response;
 use App\Http\Router;
-use App\Network\DnsClient;
 use App\Security\Ssrf;
 use App\Analytics\Counter;
 
@@ -42,7 +41,8 @@ Response::setErrorPages($config->errorPages);
 
 // 初始化安全与网络基础组件
 Ssrf::setEnabled($config->blockPrivateIps);
-Ssrf::setDnsClient(new DnsClient($config->dnsServer));
+// 默认解析服务器（逗号分隔主从 / DoH）。请求级 dns* / resolve* 由 ApiController 按次注入
+Ssrf::setDefaultServers($config->dnsServer);
 
 // 统计计数（配置 counter-url 后启用；node-id 非空时随计数上报用于区分节点）
 Counter::configure($config->counterUrl, $config->nodeId);

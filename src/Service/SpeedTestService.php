@@ -6,8 +6,8 @@ namespace App\Service;
 
 use App\Cache\InFlightGuard;
 use App\Config;
-use App\Network\DnsClient;
 use App\Network\HttpProbe;
+use App\Network\ReqResolve;
 use App\Analytics\Counter;
 use RuntimeException;
 
@@ -19,7 +19,7 @@ final class SpeedTestService
 {
     public const CACHE_TTL = 60; // 1 分钟
 
-    public function __construct(private Config $config)
+    public function __construct(private Config $config, private ReqResolve $req)
     {
     }
 
@@ -28,7 +28,8 @@ final class SpeedTestService
      */
     public function test(string $url, string $version, string $counterPage = ''): array
     {
-        $cacheKey = 'speed:' . $url . ':' . $version;
+        // 请求级覆盖拼进缓存键（无覆盖时键与旧版一致）
+        $cacheKey = 'speed:' . $url . ':' . $version . $this->req->cacheKey();
         return InFlightGuard::run(
             $cacheKey,
             self::CACHE_TTL,
@@ -40,7 +41,7 @@ final class SpeedTestService
     private function doTest(string $url, string $version): array
     {
         try {
-            $probe = new HttpProbe(new DnsClient($this->config->dnsServer), $version);
+            $probe = new HttpProbe($this->config, $this->req, $version);
             $r = $probe->probe($url);
             return [
                 'version'           => $version,

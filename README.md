@@ -110,7 +110,7 @@ server {
 | `port` | 数字 | 默认 8080（仅参考，实际端口由服务器决定） |
 | `gh-proxy` | URL 前缀 | 已无实际用途（IP 库下载砍掉了），保留兼容 |
 | `single-stack` | `""` / `ipv4` / `ipv6` | 空 = 双栈；其他值按双栈处理 |
-| `dns-server` | `IP:PORT` | 默认 `119.28.28.28:53`（国内可达） |
+| `dns-server` | 逗号分隔的 `IP:PORT` 或 `http(s)://` DoH URL | 默认 `119.28.28.28:53`（国内可达）。第一个为主，查询失败自动切换下一个；IPv6 服务器写 `[addr]:port` |
 | `block-private-ips` | **布尔** `true`/`false` | 默认 true（SSRF 防护）。**必须写 JSON 布尔**，写字符串 `"false"` 会关闭防护 |
 | `cors` | 逗号分隔的 Origin | 空 = 允许所有来源 |
 | `counter-url` | 统计接口 URL | 空 = 关闭计数 |
@@ -133,6 +133,34 @@ server {
 | `GET /v1/tcping/:ip` | TCPing（`?port=&count=`） |
 | `GET /v1/speed/:version/*url` | 网站测速（v4/v6） |
 | `GET /v1/whois/:domain` | WHOIS 查询 |
+
+### 请求级解析参数（自定义 DNS / 自定义解析）
+
+`/v1/detail`、`/v1/ssl`、`/v1/speed`、`/v1/tcping`、`/v1/dns` 额外接受一组 query 参数，用于按次覆盖解析行为（与 Go 版一致）：
+
+| 参数 | 取值 | 说明 |
+|------|------|------|
+| `dns` | 逗号分隔的 `ip:port` 或 `http(s)://` DoH URL | 本次查询改用指定 DNS 服务器，取代配置的 `dns-server` |
+| `dns4` | 同上 | 只覆盖 IPv4 族解析，**优先于 `dns`** |
+| `dns6` | 同上 | 只覆盖 IPv6 族解析，**优先于 `dns`** |
+| `resolve` | 逗号分隔的 `域名:目标`，目标为 IP 或域名 | 强制改写某域名的解析结果（两栈通用） |
+| `resolve4` | 同上 | 只影响 IPv4 侧；非空时 IPv4 侧**只用这张表** |
+| `resolve6` | 同上 | 只影响 IPv6 侧；非空时 IPv6 侧**只用这张表** |
+
+- `dns*`（换服务器去问）与 `resolve*`（直接改答案）正交，可同时使用。
+- `resolve*` 目标是 IP → 拨号直接连该 IP（仍做私网校验）；目标是域名 → 当作新 host 继续解析。
+- 参数存在但**所有项都非法**时返回 `400`，不会静默忽略；非法项在混写时被丢弃。
+- `dns` 拨测只取 `dns*`（问的就是真实解析结果，改写会自相矛盾）；`whois` / `dnssec` 不接受这些参数。
+- 带覆盖的请求按独立缓存键缓存，不同服务器/映射的结果不会互相串味。
+
+```bash
+# 换服务器解析
+curl "https://example.com/v1/detail/https://www.example.com?dns=1.1.1.1:53"
+# DoH 服务器
+curl "https://example.com/v1/dns/a/example.com?dns=https://doh.pub/dns-query"
+# 强制把域名解析到指定 IP
+curl "https://example.com/v1/tcping/example.com?port=443&resolve4=example.com:93.184.216.34"
+```
 
 ## 七、常见问题
 

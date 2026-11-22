@@ -6,6 +6,7 @@ namespace App\Service;
 
 use App\Cache\InFlightGuard;
 use App\Config;
+use App\Network\ReqResolve;
 use App\Network\TcpPinger;
 use App\Analytics\Counter;
 
@@ -17,7 +18,7 @@ final class TcpingService
 {
     public const CACHE_TTL = 60; // 1 分钟
 
-    public function __construct(private Config $config)
+    public function __construct(private Config $config, private ReqResolve $req)
     {
     }
 
@@ -26,7 +27,8 @@ final class TcpingService
      */
     public function ping(string $host, int $port, int $count, string $counterPage = ''): array
     {
-        $cacheKey = 'tcping:' . $host . ':' . $port . ':' . $count;
+        // 请求级覆盖拼进缓存键（无覆盖时键与旧版一致）
+        $cacheKey = 'tcping:' . $host . ':' . $port . ':' . $count . $this->req->cacheKey();
         return InFlightGuard::run(
             $cacheKey,
             self::CACHE_TTL,
@@ -37,7 +39,7 @@ final class TcpingService
 
     private function doPing(string $host, int $port, int $count): array
     {
-        $pinger = new TcpPinger();
+        $pinger = new TcpPinger($this->config, $this->req);
         $portStr = (string) $port;
 
         switch ($this->config->singleStack) {
