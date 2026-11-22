@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Network;
 
+use App\Config;
 use App\Security\Ssrf;
 use RuntimeException;
 
@@ -17,35 +18,50 @@ final class TcpPinger
     private float $timeoutMs;
     private float $intervalMs;
 
-    public function __construct(float $timeoutMs = 10_000, float $intervalMs = 100)
-    {
+    public function __construct(
+        private Config $config,
+        private ReqResolve $req,
+        float $timeoutMs = 10_000,
+        float $intervalMs = 100
+    ) {
         $this->timeoutMs = $timeoutMs;
         $this->intervalMs = $intervalMs;
     }
 
     /**
      * 解析主机为指定协议族的 IP（v4 → A 记录，v6 → AAAA 记录），并做 SSRF 校验。
+     * 对齐 Go 版 ResolveHostWith：resolve* 命中先改写 host，字面 IP 不查 DNS，
+     * 私网判定优先于族校验（安全判定先于参数语义）。
      */
     private function resolveHost(string $host, string $version): string
     {
-        $clean = trim($host, '[]');
-        if (filter_var($clean, FILTER_VALIDATE_IP) !== false) {
-            $ip = $clean;
-            if ($version === 'v4' && str_contains($ip, ':')) {
-                throw new RuntimeException("host {$host} is not a v4 address");
+        $wantV6 = $version === 'v6';
+        $target = $this->req->override($host, $wantV6);
+        $name = $target !== '' ? trim($target, '[]') : trim($host, '[]');
+
+        if (filter_var($name, FILTER_VALIDATE_IP) !== false) {
+            // 字面 IP：私网优先拦截（tcping 是裸 TCP，不经过出站客户端，这里不做就没人拦）
+            if (Ssrf::enabled() && Ssrf::isPrivateIp($name)) {
+                throw new RuntimeException("connection to private/internal address {$name} is not allowed");
             }
-            if ($version === 'v6' && !str_contains($ip, ':')) {
-                throw new RuntimeException("host {$host} is not a v6 address");
+            if ($wantV6 !== str_contains($name, ':')) {
+                throw new RuntimeException("host {$host} is not a {$version} address");
             }
-        } else {
-            $dns = new DnsClient();
-            $type = $version === 'v6' ? 'AAAA' : 'A';
-            $result = $dns->query($host, $type);
-            if ($result['record'] === []) {
-                throw new RuntimeException("no {$version} address found for {$host}");
-            }
-            $ip = $result['record'][0];
+            return $name;
         }
+
+        // 请求级 dns* 优先，未覆盖则用配置 dns-server
+        $servers = $this->req->servers($wantV6 ? 'ipv6' : 'ipv4');
+        $dns = new DnsClient($servers !== [] ? $servers : $this->config->dnsServer);
+        try {
+            $result = $dns->query($name, $wantV6 ? 'AAAA' : 'A');
+        } catch (RuntimeException $e) {
+            throw new RuntimeException('DNS lookup failed: ' . $e->getMessage());
+        }
+        if ($result['record'] === []) {
+            throw new RuntimeException("no {$version} address found for {$name}");
+        }
+        $ip = $result['record'][0];
 
         if (Ssrf::enabled() && Ssrf::isPrivateIp($ip)) {
             throw new RuntimeException("connection to private/internal address {$ip} is not allowed");

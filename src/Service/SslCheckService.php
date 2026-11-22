@@ -6,8 +6,8 @@ namespace App\Service;
 
 use App\Cache\InFlightGuard;
 use App\Config;
-use App\Network\DnsClient;
 use App\Network\HttpProbe;
+use App\Network\ReqResolve;
 use App\Security\Ssrf;
 use App\Support\UrlHelper;
 use App\Analytics\Counter;
@@ -23,7 +23,7 @@ final class SslCheckService
     private const FAIL_CACHE_TTL = 30;
     private const GO_ZERO_TIME = '0001-01-01T00:00:00Z'; // 对齐 Go time.Time{} 的 JSON
 
-    public function __construct(private Config $config)
+    public function __construct(private Config $config, private ReqResolve $req)
     {
     }
 
@@ -32,7 +32,8 @@ final class SslCheckService
      */
     public function check(string $url, string $counterPage = ''): array
     {
-        $cacheKey = 'ssl:' . $url;
+        // 请求级覆盖拼进缓存键（无覆盖时键与旧版一致）
+        $cacheKey = 'ssl:' . $url . $this->req->cacheKey();
         return InFlightGuard::run($cacheKey, self::CACHE_TTL, function () use ($url, $cacheKey) {
             $result = $this->doCheck($url);
             if ($this->anyUnreachable($result)) {
@@ -78,7 +79,7 @@ final class SslCheckService
     private function checkOne(string $url, string $version): array
     {
         try {
-            $probe = new HttpProbe(new DnsClient($this->config->dnsServer), $version);
+            $probe = new HttpProbe($this->config, $this->req, $version);
             $r = $probe->probe($url);
 
             $certPem = $r->certInfo[0]['Cert'] ?? null;

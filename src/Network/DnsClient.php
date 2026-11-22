@@ -7,9 +7,12 @@ namespace App\Network;
 use RuntimeException;
 
 /**
- * DNS 客户端：通过 UDP 直连指定 DNS 服务器，构造/解析 DNS 报文。
+ * DNS 客户端：构造/解析 DNS 报文，向指定服务器查询。
  * 对应 Go 版 webtest/dns.go（基于 miekg/dns），返回结构一致：
  *   { domain, record[], ttl, duration }
+ *
+ * 服务器列表支持主从 failover：每项为 "ip:port"（UDP，IPv6 写 [addr]:port）
+ * 或 http(s):// DoH URL（RFC 8484 POST）；前一台失败自动切换下一台。
  */
 final class DnsClient
 {
@@ -28,16 +31,39 @@ final class DnsClient
         'CAA'    => 257,
     ];
 
-    private string $serverIp;
-    private int $serverPort;
+    private const DEFAULT_SERVER = '119.28.28.28:53';
+
+    /** @var string[] 服务器列表（ip:port 或 DoH URL），按主从顺序尝试 */
+    private array $servers;
     private float $timeout;
 
-    public function __construct(string $server = '119.28.28.28:53', float $timeout = 3.0)
+    /**
+     * @param string|string[] $servers 逗号分隔串或已切分的列表；
+     *                                 每项为 "ip:port"（UDP，IPv6 写 [addr]:port）或 http(s):// DoH URL。
+     *                                 非法项丢弃，全非法时回退默认服务器（对齐 Go 版 validServers 语义）。
+     */
+    public function __construct(string|array $servers = self::DEFAULT_SERVER, float $timeout = 3.0)
     {
-        $parts = explode(':', $server, 2);
-        $this->serverIp = trim($parts[0], '[]');
-        $this->serverPort = isset($parts[1]) ? (int) $parts[1] : 53;
+        $raw = is_array($servers) ? $servers : explode(',', $servers);
+        $valid = [];
+        foreach ($raw as $item) {
+            $item = trim((string) $item);
+            if ($item !== '' && ReqResolve::validServerAddr($item)) {
+                $valid[] = $item;
+            }
+        }
+        $this->servers = $valid === [] ? [self::DEFAULT_SERVER] : $valid;
         $this->timeout = $timeout;
+    }
+
+    /**
+     * 当前生效的服务器列表（主从顺序）。
+     *
+     * @return string[]
+     */
+    public function servers(): array
+    {
+        return $this->servers;
     }
 
     /**
@@ -208,11 +234,97 @@ final class DnsClient
     }
 
     /**
-     * 发送 UDP 报文并接收响应。
+     * 发送报文并接收响应：按主从顺序尝试，前一台失败自动切换下一台
+     * （对应 Go 版 queryWithServers）。
      */
     private function exchange(string $packet): string
     {
-        $sock = @socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
+        $lastError = 'DNS query failed';
+        foreach ($this->servers as $server) {
+            try {
+                return $this->exchangeOne($packet, $server);
+            } catch (RuntimeException $e) {
+                $lastError = $e->getMessage();
+            }
+        }
+        throw new RuntimeException($lastError);
+    }
+
+    /**
+     * 向单台服务器查询：DoH URL 走 HTTP POST，其余走 UDP。
+     */
+    private function exchangeOne(string $packet, string $server): string
+    {
+        if (str_starts_with($server, 'http://') || str_starts_with($server, 'https://')) {
+            return $this->exchangeDoH($packet, $server);
+        }
+        return $this->exchangeUdp($packet, $server);
+    }
+
+    /**
+     * DoH（RFC 8484，POST application/dns-message）。
+     *
+     * 刻意不做私网/回环拦截：endpoint 可来自 dns-server 配置或请求级 dns=，
+     * 节点上自建内网 DoH（127.0.0.1 / 10.x）是合理部署，堵私网会直接打死功能
+     * （与 Go 版 queryDoHMsg 的取舍一致）。
+     */
+    private function exchangeDoH(string $packet, string $endpoint): string
+    {
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL            => $endpoint,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $packet,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 5,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_HTTPHEADER     => [
+                'Content-Type: application/dns-message',
+                'Accept: application/dns-message',
+            ],
+        ]);
+        $body = curl_exec($ch);
+        $errno = curl_errno($ch);
+        $error = curl_error($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($errno !== 0) {
+            throw new RuntimeException('DoH request failed: ' . ($error !== '' ? $error : "curl error {$errno}"));
+        }
+        if ($status !== 200) {
+            throw new RuntimeException("DoH API returned status {$status}");
+        }
+        if (!is_string($body) || strlen($body) < 12) {
+            throw new RuntimeException('DoH response too short');
+        }
+
+        return $body;
+    }
+
+    /**
+     * UDP 查询单台服务器（支持 IPv4 / IPv6；IPv6 服务器须写成 [addr]:port）。
+     */
+    private function exchangeUdp(string $packet, string $server): string
+    {
+        $endpoint = ReqResolve::splitHostPort($server);
+        if ($endpoint === null) {
+            throw new RuntimeException("invalid DNS server: {$server}");
+        }
+        [$host, $port] = $endpoint;
+
+        $isV6 = filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
+        if (filter_var($host, FILTER_VALIDATE_IP) === false) {
+            // 主机名形式：先解析成 IP（Go 的 net.Dial 会做同样的事）
+            $resolved = gethostbyname($host);
+            if ($resolved === $host) {
+                throw new RuntimeException("cannot resolve DNS server {$host}");
+            }
+            $host = $resolved;
+            $isV6 = false;
+        }
+
+        $sock = @socket_create($isV6 ? AF_INET6 : AF_INET, SOCK_DGRAM, SOL_UDP);
         if ($sock === false) {
             throw new RuntimeException('failed to create UDP socket: ' . socket_strerror(socket_last_error()));
         }
@@ -222,7 +334,7 @@ final class DnsClient
         @socket_set_option($sock, SOL_SOCKET, SO_RCVTIMEO, ['sec' => $sec, 'usec' => $usec]);
         @socket_set_option($sock, SOL_SOCKET, SO_SNDTIMEO, ['sec' => $sec, 'usec' => $usec]);
 
-        if (!@socket_connect($sock, $this->serverIp, $this->serverPort)) {
+        if (!@socket_connect($sock, $host, $port)) {
             $err = socket_strerror(socket_last_error($sock));
             socket_close($sock);
             throw new RuntimeException("DNS connect failed: {$err}");

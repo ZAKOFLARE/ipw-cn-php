@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Network;
 
+use App\Config;
 use App\Security\Ssrf;
 use App\Support\UrlHelper;
 use RuntimeException;
@@ -12,7 +13,8 @@ use RuntimeException;
  * HTTP 探测客户端：对应 Go 版 main.go 的 checkWebsite / websiteSpeed / checkSSL 共用连接层。
  *
  * 关键设计：
- *  - 先用 DnsClient 按协议族（v4→A / v6→AAAA）解析域名，记录 DNS 耗时；
+ *  - 按协议族（v4→A / v6→AAAA）解析域名并记录 DNS 耗时；服务器取请求级 dns* 覆盖，
+ *    未覆盖则用配置 dns-server（主从 failover / DoH）；resolve* 命中时直接改写目标；
  *  - 再用 CURLOPT_RESOLVE 把 host 强制绑定到解析出的 IP，确保协议族与 DNS 服务器可控；
  *  - 关闭 curl 自动重定向，手动逐跳跟随并做 SSRF 校验（对齐 Go 版 SecureCheckRedirect）；
  *  - https 传输失败时 fallback 到 http（对齐 Go 版 fallbackToHTTP 逻辑）。
@@ -22,13 +24,11 @@ final class HttpProbe
     private const MAX_REDIRECTS = 10;
     private const TIMEOUT = 10; // 秒，对齐 Go 版 resty 10s 超时
 
-    private DnsClient $dns;
-    private string $version;
-
-    public function __construct(DnsClient $dns, string $version)
-    {
-        $this->dns = $dns;
-        $this->version = $version;
+    public function __construct(
+        private Config $config,
+        private ReqResolve $req,
+        private string $version
+    ) {
     }
 
     /**
@@ -116,16 +116,32 @@ final class HttpProbe
         $port = UrlHelper::port($url);
         $scheme = strtolower((string) ($parts['scheme'] ?? 'https'));
 
-        // 1. DNS 解析（按协议族），耗时独立记录
-        $dnsType = $this->version === 'v6' ? 'AAAA' : 'A';
-        $dnsStart = microtime(true);
-        $dnsResult = $this->dns->query($host, $dnsType);
-        $result->dnsLookupTime = round((microtime(true) - $dnsStart) * 1000, 3);
+        // 1. 解析目标：resolve* 命中就把目标当作新 host——IP 直连，域名继续走 DNS
+        $wantV6 = $this->version === 'v6';
+        $target = $this->req->override($host, $wantV6);
+        $lookupHost = $target !== '' ? trim($target, '[]') : $host;
 
-        if ($dnsResult['record'] === []) {
-            throw new RuntimeException("no {$this->version} address found for {$host}");
+        if (filter_var($lookupHost, FILTER_VALIDATE_IP) !== false) {
+            // 字面 IP 不查 DNS（对齐 Go 版 ResolveHostWith），族不符直接报错
+            if ($wantV6 !== str_contains($lookupHost, ':')) {
+                throw new RuntimeException("host {$lookupHost} is not a {$this->version} address");
+            }
+            $ip = $lookupHost;
+            $result->dnsLookupTime = 0.0;
+        } else {
+            // 请求级 dns* 优先，未覆盖则用配置 dns-server，耗时独立记录
+            $servers = $this->req->servers($wantV6 ? 'ipv6' : 'ipv4');
+            $dns = new DnsClient($servers !== [] ? $servers : $this->config->dnsServer);
+            $dnsStart = microtime(true);
+            $dnsResult = $dns->query($lookupHost, $wantV6 ? 'AAAA' : 'A');
+            $result->dnsLookupTime = round((microtime(true) - $dnsStart) * 1000, 3);
+
+            if ($dnsResult['record'] === []) {
+                throw new RuntimeException("no {$this->version} address found for {$lookupHost}");
+            }
+            $ip = $dnsResult['record'][0];
         }
-        $ip = $dnsResult['record'][0];
+
         if (Ssrf::enabled() && Ssrf::isPrivateIp($ip)) {
             throw new RuntimeException('request to private/internal address is not allowed');
         }

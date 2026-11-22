@@ -6,8 +6,8 @@ namespace App\Service;
 
 use App\Cache\InFlightGuard;
 use App\Config;
-use App\Network\DnsClient;
 use App\Network\HttpProbe;
+use App\Network\ReqResolve;
 use App\Security\Ssrf;
 use App\Support\UrlHelper;
 use App\Analytics\Counter;
@@ -22,7 +22,7 @@ final class WebsiteCheckService
     public const CACHE_TTL = 300; // 5 分钟
     private const FAIL_CACHE_TTL = 30; // 不可达结果短缓存（对齐 Go 版 30s 后删）
 
-    public function __construct(private Config $config)
+    public function __construct(private Config $config, private ReqResolve $req)
     {
     }
 
@@ -31,7 +31,8 @@ final class WebsiteCheckService
      */
     public function check(string $url, string $counterPage = ''): array
     {
-        $cacheKey = 'detail:' . $url;
+        // 请求级覆盖拼进缓存键：不同服务器/映射的结果各占一条，不互相串味；无覆盖时键不变
+        $cacheKey = 'detail:' . $url . $this->req->cacheKey();
         return InFlightGuard::run($cacheKey, self::CACHE_TTL, function () use ($url, $cacheKey) {
             $result = $this->doCheck($url);
             if ($this->anyUnreachable($result)) {
@@ -76,7 +77,7 @@ final class WebsiteCheckService
     private function checkOne(string $url, string $version): array
     {
         try {
-            $probe = new HttpProbe(new DnsClient($this->config->dnsServer), $version);
+            $probe = new HttpProbe($this->config, $this->req, $version);
             $r = $probe->probe($url);
             return [
                 'host_record'       => $r->hostRecord,
